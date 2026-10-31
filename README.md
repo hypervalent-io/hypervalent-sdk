@@ -2,7 +2,7 @@
 
 TypeScript client for the Hypervalent public API. Node 22+, modern browsers, Cloudflare Workers, Deno and Bun, with zero runtime dependencies.
 
-> **Status: early.** The package covers every public API operation and webhook verification, and is not yet published to npm.
+> **Status: early.** The package covers every public API operation and webhook verification. Its first npm release, 0.1.0, is prepared and not yet published.
 
 ## Usage
 
@@ -154,7 +154,7 @@ The timestamp bounds replay rather than ending it: each attempt is signed afresh
 
 ```bash
 npm ci
-npm run verify   # lint, check, typecheck, test, build, Node smoke, Workers bundle
+npm run verify   # lint, check, typecheck, test, build, Node smoke, Workers bundle, release and package checks
 ```
 
 | Script | Does |
@@ -167,12 +167,19 @@ npm run verify   # lint, check, typecheck, test, build, Node smoke, Workers bund
 | `npm test` | Vitest, including the webhook verifier running in workerd |
 | `npm run smoke` | Imports the built package in Node, as ESM and CJS |
 | `npm run check:workers` | Bundles the built package for Workers, failing on any Node built-in |
+| `npm run check:release` | Fails unless `package.json` and `CHANGELOG.md` are ready to release |
+| `npm run check:package` | Installs the packed tarball in a new project and runs a read from it, as ESM and CJS, against a local server |
+| `npm run release:dry-run` | `npm publish --dry-run`: shows what would ship and publishes nothing |
 | `npm run spec:drift` | Compares `openapi.json` with the published spec |
 | `npm run spec:sync` | Replaces `openapi.json` with the published spec and regenerates |
 
 ## API spec
 
 `openapi.json` is a vendored copy of [the published spec](https://docs.hypervalent.io/openapi.json). Never edit it or `src/generated/` by hand. A scheduled workflow fails when the copy falls behind; `npm run spec:sync` brings it up to date.
+
+## Releasing
+
+A `vX.Y.Z` tag on `main` publishes to npm through `.github/workflows/release.yml`, using trusted publishing with provenance. No npm token exists, and none should be created. The tag must match `package.json`, and `CHANGELOG.md` must have a section for the version, so set both in a pull request before tagging.
 
 ## License
 

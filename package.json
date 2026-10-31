@@ -1,6 +1,6 @@
 {
   "name": "@hypervalent-io/sdk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "TypeScript client for the Hypervalent public API",
   "license": "MIT",
   "repository": {
@@ -46,7 +46,8 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
@@ -61,7 +62,10 @@
     "check:workers": "node scripts/check-workers-bundle.mjs",
     "spec:drift": "node scripts/spec-drift.mjs",
     "spec:sync": "node scripts/spec-drift.mjs --write && npm run generate",
-    "verify": "npm run lint:ci && npm run check && npm run typecheck && npm test && npm run build && npm run smoke && npm run check:workers",
+    "check:release": "node scripts/check-release.mjs",
+    "check:package": "node scripts/check-package.mjs",
+    "release:dry-run": "npm publish --dry-run --access public",
+    "verify": "npm run lint:ci && npm run check && npm run typecheck && npm test && npm run build && npm run smoke && npm run check:workers && npm run check:release && npm run check:package",
     "prepack": "npm run build"
   },
   "devDependencies": {
@@ -78,5 +82,8 @@
     "typescript": "5.9.3",
     "typescript-eslint": "^8.72.1",
     "vitest": "^5.0.5"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
