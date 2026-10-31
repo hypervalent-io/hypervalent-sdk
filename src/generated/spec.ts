@@ -1,0 +1,54 @@
+// GENERATED from openapi.json by scripts/generate.mjs. Do not edit by hand:
+// run `npm run generate`. `npm run check` fails when this file differs.
+
+/** The `info.version` of the OpenAPI document these types were generated from. */
+export const SPEC_VERSION = "1.0.0"
+
+/** Every `operationId` in that document. */
+export const OPERATION_IDS = [
+  "listProjects",
+  "listAtoms",
+  "createAtom",
+  "getAtom",
+  "updateAtom",
+  "listDesignTokenSchemes",
+  "getDesignTheme",
+  "updateDesignTheme",
+  "listDesignTokens",
+  "updateDesignTokens",
+  "getDesignTokensCss",
+  "getDesignTokensW3C",
+  "listDocumentTypes",
+  "createDocumentType",
+  "listDocuments",
+  "createDocument",
+  "getDocument",
+  "updateDocument",
+  "publishDocument",
+  "trashDocument",
+  "unpublishDocument",
+  "getDocumentType",
+  "updateDocumentType",
+  "listLibrary",
+  "insertLibraryItems",
+  "planLibraryInsert",
+  "uploadMedia",
+  "listMolecules",
+  "createMolecule",
+  "getMolecule",
+  "updateMolecule",
+  "listSettings",
+  "getSetting",
+  "listTaxonomies",
+  "createTaxonomy",
+  "getTaxonomy",
+  "updateTaxonomy",
+  "createTerm",
+  "getTerm",
+  "updateTerm",
+  "publishTerm",
+  "trashTerm",
+  "unpublishTerm",
+  "getToken",
+  "getTokenOrgless"
+] as const

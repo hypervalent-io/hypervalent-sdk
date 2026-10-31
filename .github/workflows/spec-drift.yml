@@ -1,0 +1,23 @@
+# Fails when the vendored openapi.json differs from the published API spec, so
+# the SDK does not silently fall behind a shipped API. Fix: `npm run spec:sync`.
+name: Spec drift
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Dependency-free on purpose: this job only reads the spec and compares it.
+      - run: npm run spec:drift

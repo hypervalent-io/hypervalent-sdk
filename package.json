@@ -1,0 +1,64 @@
+{
+  "name": "@hypervalent-io/sdk",
+  "version": "0.0.0",
+  "description": "TypeScript client for the Hypervalent public API",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hypervalent-io/hypervalent-sdk.git"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "generate": "node scripts/generate.mjs",
+    "check": "node scripts/generate.mjs --check",
+    "lint": "eslint . --fix",
+    "lint:ci": "eslint .",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke-node.mjs",
+    "check:workers": "node scripts/check-workers-bundle.mjs",
+    "spec:drift": "node scripts/spec-drift.mjs",
+    "spec:sync": "node scripts/spec-drift.mjs --write && npm run generate",
+    "verify": "npm run lint:ci && npm run check && npm run typecheck && npm test && npm run build && npm run smoke && npm run check:workers",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
+    "globals": "^17.13.0",
+    "openapi-typescript": "7.13.0",
+    "tsup": "^8.5.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  }
+}
