@@ -5,6 +5,7 @@ export type SdkErrorCode
     | 'ABORTED'
     | 'UNEXPECTED_RESPONSE'
     | 'BROWSER_WRITE_UNSUPPORTED'
+    | 'PROJECT_REQUIRED'
 
 /** Codes the public API documents. */
 export type ApiErrorCode

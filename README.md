@@ -2,18 +2,25 @@
 
 TypeScript client for the Hypervalent public API. Node 22+, modern browsers, Cloudflare Workers, Deno and Bun, with zero runtime dependencies.
 
-> **Status: early.** The package ships the generated API types, the transport and webhook verification below, and is not yet published to npm. The resource client (`hv.project(…).documents(…)`) follows.
+> **Status: early.** The package covers every public API operation and webhook verification, and is not yet published to npm.
 
 ## Usage
 
 ```ts
 import { createClient, isHypervalentError } from '@hypervalent-io/sdk'
 
-const hv = createClient({ token: process.env.HYPERVALENT_TOKEN! })
+const hv = createClient({ token: process.env.HYPERVALENT_TOKEN!, org: 'acme' })
+
+await hv.whoami()                     // the token, its organization and its features
+
+const site = hv.project('marketing')  // omit the slug on a project-narrowed token
+
+const { document } = await site.documents('post').create({ title: 'Hello' })
+await site.documents('post').publish(document.slug)
 
 try {
-  // Relative to /v1/orgs/:org. The org is read once from GET /v1/token unless you pass `org`.
-  const { body } = await hv.request('GET', '/projects', { query: { limit: 50 } })
+  const page = await site.documents('post').list({ limit: 50 })
+  console.log(page.documents.results, page.documents.count)
 }
 catch (err) {
   if (isHypervalentError(err) && err.code === 'RATE_LIMITED') console.log(err.retryAfterSeconds)
@@ -23,20 +30,88 @@ catch (err) {
 | Option | Default | Notes |
 |---|---|---|
 | `token` | required | Never logged or put on an error |
-| `org` | read from `GET /v1/token` | The `org_id` |
+| `org` | read once from `GET /v1/token` | The `org_id`. Pass it to save that request. See [Workers](#cloudflare-workers) |
 | `baseUrl` | `https://api.hypervalent.io` | |
-| `timeoutMs` | `15000` | Per attempt; `request()` can override it |
+| `timeoutMs` | `15000` | Per attempt; each call can override it. Media uploads default to `60000` |
 | `maxRetries` | `2` | `0` turns retries off |
 | `maxRetryDelayMs` | `30000` | A longer `Retry-After` throws instead of waiting |
 | `fetch` | global `fetch` | For tests, proxies and local TLS |
 
-`request()` also takes `query`, `body` (JSON, or a `FormData`), `headers`, `accept`, `signal`, `timeoutMs` and `orgless` (makes `path` relative to `/v1`). It answers `{ status, headers, body }`.
+### Resources
 
-**Every failure throws one `HypervalentError`.** Branch on `code`; `message` is localized. `status` is 0 when there was no HTTP answer, with the code `TIMEOUT`, `NETWORK_ERROR` or `ABORTED`. A non-2xx without our error body is `UNEXPECTED_RESPONSE`, and any 429 is `RATE_LIMITED`.
+| Under | Methods |
+|---|---|
+| `hv` | `whoami()`, `orgToken()`, `project(slug?)`, `request()` |
+| `hv.projects` | `list()`, `pages()`, `iterate()` |
+| `site.documents(doctype)`, `site.terms(taxonomy)` | `list()`, `pages()`, `iterate()`, `get()`, `create()`, `update()`, `publish()`, `unpublish()`, `trash()` |
+| `site.doctypes`, `site.taxonomies`, `site.atoms`, `site.molecules` | `list()`, `get()`, `create()`, `update()` |
+| `site.settings` | `list()`, `get()` |
+| `site.designTokens` | `list()`, `update()`, `schemes()`, `theme()`, `updateTheme()`, `css()`, `w3c()` |
+| `site.library` | `list()`, `plan(items)`, `insert(items)` |
+| `site.media` | `upload(files)`, `uploadFromUrl(url)` |
+
+Each method answers the API's response body as is, and takes the route's query parameters as the API spells them (`status`, `token_type`) plus `signal` and `timeoutMs`. Slugs are URL-encoded for you. A slug that is empty, `.` or `..` is a `TypeError`, because a URL parser would turn it into another route.
+
+**Without a slug, `hv.project()` reads the token's project** from `GET /v1/token`, once. On an org-wide token, the first call throws `PROJECT_REQUIRED`.
+
+### Lists
+
+`documents`, `terms` and `projects` are paged, and the rest answer their full set from `list()`.
+
+```ts
+const posts = site.documents('post')
+
+await posts.list({ page: 2 })                   // one page, always exactly one request
+for await (const page of posts.pages()) {}      // each page's envelope, with its referenced media
+for await (const post of posts.iterate()) {}    // every row, one request per page
+```
+
+`pages()` and `iterate()` ask for 50 rows a page, the API's maximum, unless you pass `limit`.
+
+**A walk is not a snapshot.** Paging is by offset, so a row inserted mid-walk can shift a page boundary. `iterate()` removes the repeats that causes, but a row can still be skipped when one is removed. A build that must be exact re-runs on the matching webhook.
+
+`terms(taxonomy).list()` answers the whole taxonomy read, since the API serves a taxonomy's terms inside it. The rows are at `.terms.results`.
+
+### Root atoms
+
+The SDK passes these through as the API defines them. Reads answer an array of `{ uuid, value, locked, required }`, and writes take an object keyed by atom uuid:
+
+```ts
+const { version } = await posts.get('hello')    // version.rootAtoms: [{ uuid, value, … }]
+await posts.update('hello', { rootAtoms: { [atomUuid]: 'New value' } })
+```
+
+### Media
+
+```ts
+import { resolveFieldMedia } from '@hypervalent-io/sdk'
+
+const { images, errors } = await site.media.upload(new File([bytes], 'hero.png'), { alt: 'Hero' })
+const { image } = await site.media.uploadFromUrl('https://example.com/hero.png')
+
+const read = await posts.get('hello')
+const assets = resolveFieldMedia(read, 'video', atom.value)
+```
+
+`upload()` takes a `Blob` or `File`, or an array of them. `errors` lists the files that failed when at least one was stored.
+
+`resolveFieldMedia(read, fieldType, value)` looks a field's value up in the read that carried it. It goes by the field's type: `image` reads `referencedImages`, and `file` and `video` read `referencedFiles`. It answers an array in the value's order. A non-uuid string in a file or video field is an external URL and comes back as given, and a uuid the read does not list is left out.
+
+### Any route
+
+`hv.request(method, path, options)` calls any public route, with `path` relative to `/v1/orgs/:org`, which you encode yourself. It takes `query`, `body` (JSON, or a `FormData`), `headers`, `accept`, `signal`, `timeoutMs` and `orgless` (makes `path` relative to `/v1`), and answers `{ status, headers, body }`.
+
+### Errors, retries and browsers
+
+**Every failure throws one `HypervalentError`.** Branch on `code`; `message` is localized. `status` is 0 when there was no HTTP answer, with the code `TIMEOUT`, `NETWORK_ERROR` or `ABORTED`, and also on `PROJECT_REQUIRED` and `BROWSER_WRITE_UNSUPPORTED`, which the SDK raises without sending the call. A non-2xx without our error body is `UNEXPECTED_RESPONSE`, and any 429 is `RATE_LIMITED`.
 
 **A write is never risked twice.** A POST is retried only on a 429. A GET or HEAD is retried on 429, 502, 503, 504, a network error and a timeout. A timed-out write may have landed, so if you need safe re-runs of a create, supply a `slug`: a repeat then answers 409 `SLUG_CONFLICT`.
 
 **Browsers can read but not write.** The public API's CORS policy has no POST, so the SDK throws `BROWSER_WRITE_UNSUPPORTED` before sending one. Any token in a browser bundle is public, so only a project-narrowed `read` token belongs there.
+
+### Cloudflare Workers
+
+Pass `org`, and a slug to `hv.project()`, if a client lives at module scope. Without them the client reads `GET /v1/token` once and shares that lookup between callers, and a Worker's request cannot wait on I/O started by another request, so it may hang. We reasoned this from the Workers model and have not reproduced it. Creating the client per request also avoids it.
 
 ## Verifying webhooks
 
