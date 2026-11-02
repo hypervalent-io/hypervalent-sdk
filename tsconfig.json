@@ -16,5 +16,7 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The CLI is the one place Node belongs. tsconfig.test.json checks it.
+  "exclude": ["src/cli"]
 }

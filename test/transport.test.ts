@@ -137,7 +137,7 @@ describe('request', () => {
     expect(Object.keys(new HypervalentError({ status: 0, code: 'ABORTED', message: 'x' })).sort()).toEqual(['code', 'name', 'status'])
   })
 
-  it('accepts a schema and hands it back typed, with no other effect', async () => {
+  it('hands back a schema typegen did not generate, with no other effect', async () => {
     const f = fakeFetch(() => json(200, {}))
     const hv = createClient({ token: TOKEN, org: 'acme', fetch: f, schema: { version: 1 } })
     const version: number | undefined = hv.schema?.version

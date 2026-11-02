@@ -4,7 +4,7 @@ import { HypervalentError } from './errors'
 import { assertWriteAllowed, type HttpMethod, type HypervalentResponse, type QueryValue, type SendOptions } from './transport'
 
 type Schemas = components['schemas']
-type Answer<Op extends keyof operations> = operations[Op] extends { responses: { 200: { content: { 'application/json': infer T } } } } ? T : never
+export type Answer<Op extends keyof operations> = operations[Op] extends { responses: { 200: { content: { 'application/json': infer T } } } } ? T : never
 type Query<Op extends keyof operations> = NonNullable<operations[Op]['parameters']['query']>
 
 /** Taken by every method. */
@@ -14,10 +14,10 @@ export interface CallOptions {
   timeoutMs?: number
 }
 
-type ReadOptions<Op extends keyof operations> = Query<Op> & CallOptions
+export type ReadOptions<Op extends keyof operations> = Query<Op> & CallOptions
 
 /** `pages()` and `iterate()` choose the page themselves. `limit` defaults to the server's maximum, 50. */
-type WalkOptions<Op extends keyof operations> = Omit<Query<Op>, 'page' | 'offset'> & CallOptions
+export type WalkOptions<Op extends keyof operations> = Omit<Query<Op>, 'page' | 'offset'> & CallOptions
 
 interface Paged<Op extends keyof operations, Row> {
   /** One page, in the API's envelope. Always exactly one request. */

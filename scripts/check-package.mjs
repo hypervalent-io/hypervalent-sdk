@@ -2,7 +2,7 @@
 // runs a read from it as ESM and CJS against a local stand-in for the API.
 // Nothing goes to the registry: the package has no runtime dependencies to fetch.
 import { execFile as execFileCallback } from 'node:child_process'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -11,7 +11,7 @@ import { promisify } from 'node:util'
 
 const execFile = promisify(execFileCallback)
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const REQUIRED = ['package.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.cts', 'dist/webhooks.js', 'dist/webhooks.cjs', 'dist/webhooks.d.ts', 'dist/webhooks.d.cts']
+const REQUIRED = ['package.json', 'README.md', 'LICENSE', 'CHANGELOG.md', 'dist/index.js', 'dist/index.cjs', 'dist/index.d.ts', 'dist/index.d.cts', 'dist/webhooks.js', 'dist/webhooks.cjs', 'dist/webhooks.d.ts', 'dist/webhooks.d.cts', 'dist/cli.js']
 const TOKEN = 'atk_package_check'
 
 const READ = `
@@ -22,11 +22,24 @@ hv.project('site').documents('post').list().then((answer) => {
 })
 `
 
+const PROJECT = { uuid: '00000000-0000-4000-8000-000000000001', slug: 'site', title: 'Site' }
+const list = results => ({ results, count: results.length })
+const ROUTES = {
+  '/v1/token': { token: { projectSlug: null }, org: { slug: 'acme' } },
+  '/v1/orgs/acme/projects': { ...list([PROJECT]), limit: 50, offset: 0, page: 1 },
+  '/v1/orgs/acme/projects/site/atoms': list([{ uuid: '00000000-0000-4000-8000-000000000002', slug: 'headline', fieldType: 'text', multiple: 0 }]),
+  '/v1/orgs/acme/projects/site/molecules': list([]),
+  '/v1/orgs/acme/projects/site/taxonomies': list([]),
+  '/v1/orgs/acme/projects/site/doctypes': list([{ uuid: '00000000-0000-4000-8000-000000000003', slug: 'post', atoms: [{ uuid: '00000000-0000-4000-8000-000000000002' }], supports: [] }]),
+  '/v1/orgs/acme/projects/site/doctypes/post/documents': { documents: { results: [{ slug: 'hello' }], count: 1, limit: 25, offset: 0, page: 1 } }
+}
+
 const server = createServer((req, res) => {
   const authorized = req.headers.authorization === `Bearer ${TOKEN}`
-  res.writeHead(authorized ? 200 : 401, { 'content-type': 'application/json' })
+  const answer = ROUTES[new URL(req.url, 'http://x').pathname]
+  res.writeHead(!authorized ? 401 : answer ? 200 : 404, { 'content-type': 'application/json' })
   res.end(JSON.stringify(authorized
-    ? { documents: { results: [{ slug: 'hello' }], count: 1, limit: 25, offset: 0, page: 1 } }
+    ? answer ?? { status: 404, code: 'NOT_FOUND', message: 'no route' }
     : { status: 401, code: 'UNAUTHORIZED', message: 'bad token' }))
 })
 
@@ -54,6 +67,14 @@ try {
     const result = await execFile(process.execPath, [script], { cwd: project, env })
     process.stdout.write(result.stdout)
   }
+
+  // The way a customer runs it: through npm's bin link, with the published package name.
+  const generated = join(project, 'src', 'schema.ts')
+  const cli = await execFile('npx', ['--no-install', 'hypervalent-sdk', 'typegen', '--project', 'site', '--out', generated, '--base-url', env.CHECK_BASE_URL], { cwd: project, env: { ...env, HYPERVALENT_TOKEN: TOKEN } })
+  process.stdout.write(cli.stdout)
+  const source = await readFile(generated, 'utf8')
+  if (!source.includes('"headline": string') || !source.includes(`from '@hypervalent-io/sdk'`)) throw new Error(`unexpected typegen output:\n${source}`)
+
   console.log(`${packed.filename}: ${files.length} files, ${packed.size} bytes`)
 }
 finally {
