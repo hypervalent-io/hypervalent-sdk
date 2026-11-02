@@ -1,4 +1,5 @@
 import { HypervalentError } from './errors'
+import { type ClientResources, clientResources, segment } from './resources'
 import { abortable, assertWriteAllowed, type HttpMethod, type HypervalentResponse, isRead, send, type SendOptions, type TransportConfig } from './transport'
 
 export interface ClientOptions<Schema = unknown> {
@@ -25,7 +26,7 @@ export interface RequestOptions extends SendOptions {
   orgless?: boolean
 }
 
-export interface HypervalentClient<Schema = unknown> {
+export interface HypervalentClient<Schema = unknown> extends ClientResources {
   readonly schema: Schema | undefined
   /**
    * Calls any public route. `path` is relative to `/v1/orgs/:org` and is not
@@ -33,6 +34,18 @@ export interface HypervalentClient<Schema = unknown> {
    * of that base throws a TypeError.
    */
   request<T = unknown>(method: HttpMethod, path: string, options?: RequestOptions): Promise<HypervalentResponse<T>>
+}
+
+/** What `GET /v1/token` tells the client about itself. */
+interface Identity {
+  org: string
+  /** Null on an org-wide token. Undefined when the body did not say. */
+  projectSlug: string | null | undefined
+}
+
+interface TokenBody {
+  org?: { slug?: unknown }
+  token?: { projectSlug?: string | null }
 }
 
 const MAX_TIMER_MS = 2 ** 31 - 1
@@ -59,13 +72,13 @@ export function createClient<Schema = unknown>(options: ClientOptions<Schema>): 
   const root = `${baseUrl.replace(/\/+$/, '')}/v1`
   if (!URL.canParse(root)) throw new TypeError('createClient: baseUrl must be an absolute URL')
 
-  let orgPromise: Promise<string> | null = org ? Promise.resolve(org) : null
+  let identity: Promise<Identity> | null = null
 
   /** Runs without any caller's signal, so one caller's abort cannot fail the others sharing it. */
-  async function readOrg(): Promise<string> {
-    const { status, body } = await send<{ org?: { slug?: unknown } } | null>(config, 'GET', `${root}/token`)
+  async function readIdentity(): Promise<Identity> {
+    const { status, body } = await send<TokenBody | null>(config, 'GET', `${root}/token`)
     const slug = body?.org?.slug
-    if (typeof slug === 'string' && slug) return slug
+    if (org || (typeof slug === 'string' && slug)) return { org: org ?? slug as string, projectSlug: body?.token?.projectSlug }
     throw new HypervalentError({
       status,
       code: 'UNEXPECTED_RESPONSE',
@@ -73,37 +86,51 @@ export function createClient<Schema = unknown>(options: ClientOptions<Schema>): 
     })
   }
 
-  function resolveOrg(signal?: AbortSignal): Promise<string> {
-    if (!orgPromise) {
-      const pending = readOrg()
-      orgPromise = pending
+  function resolveIdentity(signal?: AbortSignal): Promise<Identity> {
+    if (!identity) {
+      const pending = readIdentity()
+      identity = pending
       // A failure is not remembered: the next call asks again.
       pending.catch(() => {
-        if (orgPromise === pending) orgPromise = null
+        if (identity === pending) identity = null
       })
     }
-    return abortable(orgPromise, signal)
+    return abortable(identity, signal)
   }
 
-  return {
-    schema,
-    async request<T = unknown>(method: HttpMethod, path: string, requestOptions: RequestOptions = {}) {
-      if (!path.startsWith('/')) throw new TypeError('request: path must start with "/"')
-      const { orgless, query, ...sendOptions } = requestOptions
-      // Checked here too, so a refused write spends no request on the org lookup.
-      const verb = method.toUpperCase()
-      assertWriteAllowed(verb)
-      // Fetch would refuse these with a TypeError that reads as a network failure, and retry it.
-      if (sendOptions.body !== undefined && isRead(verb)) throw new TypeError(`request: a ${verb} cannot carry a body`)
-      if (sendOptions.timeoutMs !== undefined) assertRange('timeoutMs', sendOptions.timeoutMs, 1, MAX_TIMER_MS)
+  const resolveOrg = async (signal?: AbortSignal) => org ?? (await resolveIdentity(signal)).org
 
-      const base = orgless ? root : `${root}/orgs/${encodeURIComponent(await resolveOrg(sendOptions.signal))}`
-      const url = new URL(base + path)
-      if (!url.pathname.startsWith(`${new URL(base).pathname}/`)) throw new TypeError('request: path must stay under its base')
-      for (const [key, value] of Object.entries(query ?? {})) {
-        if (value !== undefined && value !== null) url.searchParams.set(key, String(value))
-      }
-      return send<T>(config, method, url.href, sendOptions)
+  async function tokenProjectSlug(signal?: AbortSignal): Promise<string> {
+    const { projectSlug } = await resolveIdentity(signal)
+    if (projectSlug) return projectSlug
+    if (projectSlug === undefined) {
+      throw new HypervalentError({ status: 200, code: 'UNEXPECTED_RESPONSE', message: 'GET /v1/token did not describe the token. Name a project: hv.project(\'slug\').' })
     }
+    throw new HypervalentError({
+      status: 0,
+      code: 'PROJECT_REQUIRED',
+      message: 'This token is not narrowed to a live project. Name one: hv.project(\'slug\').'
+    })
   }
+
+  async function request<T = unknown>(method: HttpMethod, path: string, requestOptions: RequestOptions = {}): Promise<HypervalentResponse<T>> {
+    if (!path.startsWith('/')) throw new TypeError('request: path must start with "/"')
+    const { orgless, query, ...sendOptions } = requestOptions
+    // Checked here too, so a refused write spends no request on the org lookup.
+    const verb = method.toUpperCase()
+    assertWriteAllowed(verb)
+    // Fetch would refuse these with a TypeError that reads as a network failure, and retry it.
+    if (sendOptions.body !== undefined && isRead(verb)) throw new TypeError(`request: a ${verb} cannot carry a body`)
+    if (sendOptions.timeoutMs !== undefined) assertRange('timeoutMs', sendOptions.timeoutMs, 1, MAX_TIMER_MS)
+
+    const base = orgless ? root : `${root}/orgs/${segment('org', await resolveOrg(sendOptions.signal))}`
+    const url = new URL(base + path)
+    if (!url.pathname.startsWith(`${new URL(base).pathname}/`)) throw new TypeError('request: path must stay under its base')
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value !== undefined && value !== null) url.searchParams.set(key, String(value))
+    }
+    return send<T>(config, method, url.href, sendOptions)
+  }
+
+  return { schema, request, ...clientResources(request, tokenProjectSlug) }
 }
