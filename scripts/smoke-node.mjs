@@ -2,7 +2,10 @@
 import { createRequire } from 'node:module'
 
 const esm = await import('@hypervalent-io/sdk')
-const cjs = createRequire(import.meta.url)('@hypervalent-io/sdk')
+const require = createRequire(import.meta.url)
+const cjs = require('@hypervalent-io/sdk')
+const esmWebhooks = await import('@hypervalent-io/sdk/webhooks')
+const cjsWebhooks = require('@hypervalent-io/sdk/webhooks')
 
 for (const [format, sdk] of [['ESM', esm], ['CJS', cjs]]) {
   if (typeof sdk.SPEC_VERSION !== 'string') {
@@ -20,4 +23,19 @@ for (const [format, sdk] of [['ESM', esm], ['CJS', cjs]]) {
 if (!cjs.isHypervalentError(new esm.HypervalentError({ status: 0, code: 'ABORTED', message: 'x' }))) {
   console.error('isHypervalentError does not hold across the ESM and CJS builds')
   process.exit(1)
+}
+
+for (const [format, webhooks] of [['ESM', esmWebhooks], ['CJS', cjsWebhooks]]) {
+  try {
+    await webhooks.verifyWebhook({ rawBody: '{}', signature: 'nonsense', secret: 'whsec_x' })
+    console.error(`${format} verifyWebhook accepted a bad signature`)
+    process.exit(1)
+  }
+  catch (err) {
+    if (!esmWebhooks.isWebhookVerificationError(err) || !cjsWebhooks.isWebhookVerificationError(err)) {
+      console.error(`${format} webhooks build threw the wrong error: ${err}`)
+      process.exit(1)
+    }
+  }
+  console.log(`${format} webhooks import OK`)
 }
