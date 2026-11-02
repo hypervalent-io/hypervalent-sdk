@@ -2,12 +2,16 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Hypervalent Public API",
-    "version": "1.0.0",
+    "version": "1.5.0",
     "summary": "The token-authenticated content delivery and authoring API behind Hypervalent Studio.",
     "description": "Every route lives under `/orgs/{org_id}/projects/{projectSlug}/…` — the project is a **required path segment**, never a query\nparameter — except the two org-level discovery reads (`/token`, `/projects`). Authenticate with an organization API token\n(`atk_…`) in `Authorization: Bearer` or `X-API-Key`. Bodies are JSON with camelCase keys. Read responses for organizations\nwithout the `removeBranding` entitlement carry a `poweredBy` string.\n\nThis document is generated from the server's route table and token allow-list; the schemas are hand-authored beside\nthe shapers they describe. See https://docs.hypervalent.io/api/ for the guide.",
     "contact": {
       "name": "Hypervalent",
       "url": "https://hypervalent.io"
+    },
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
     }
   },
   "servers": [
@@ -92,7 +96,7 @@
               "minimum": 1,
               "default": 1
             },
-            "description": "1-based page number. Ignored when `offset` is given."
+            "description": "1-based page number. Wins over `offset` when both are given."
           },
           {
             "name": "offset",
@@ -101,7 +105,7 @@
               "type": "integer",
               "minimum": 0
             },
-            "description": "Row offset — an alternative to `page`."
+            "description": "Row offset — an alternative to `page`, ignored when a valid `page` is given."
           }
         ],
         "responses": {
@@ -2187,6 +2191,48 @@
             "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
           },
           {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "title",
+                "-title",
+                "datePublished",
+                "-datePublished",
+                "dateModified",
+                "-dateModified"
+              ],
+              "default": "title"
+            },
+            "description": "The order of the list; a leading `-` reverses it. Every order breaks ties the same way, so offset paging stays deterministic. A document with no `datePublished` (a never-published draft in the `status=draft` view) sorts as the oldest: first ascending, last descending."
+          },
+          {
+            "name": "taxonomy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "The slug of the taxonomy that owns `term`. Send both or neither."
+          },
+          {
+            "name": "term",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Lists only the documents tagged with this term, and `count` counts only those. Tags belong to a version, so a published read matches the active version's tags and `status=draft` the working version's. A term this read cannot see answers 404, the same as an unknown slug."
+          },
+          {
+            "name": "modifiedSince",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Lists only the rows with a `dateModified` at or after this instant, and `count` counts only those. An ISO 8601 date-time with a zone, like `2026-01-31T09:30:00Z`; anything else is a 422, and a `+` offset must be percent-encoded. Inclusive to the second, so a row can come back twice across builds but is not missed. It **cannot report removals**: a row that leaves the view, trashed or (in the published view) unpublished, just stops appearing, so pair it with a periodic full walk or with webhooks. An edit to a term or image a row references does not move the row's `dateModified`. Saving a draft of a published row moves it too, so a published read can return it with its content unchanged."
+          },
+          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -2205,7 +2251,7 @@
               "minimum": 1,
               "default": 1
             },
-            "description": "1-based page number. Ignored when `offset` is given."
+            "description": "1-based page number. Wins over `offset` when both are given."
           },
           {
             "name": "offset",
@@ -2214,7 +2260,7 @@
               "type": "integer",
               "minimum": 0
             },
-            "description": "Row offset — an alternative to `page`."
+            "description": "Row offset — an alternative to `page`, ignored when a valid `page` is given."
           }
         ],
         "responses": {
@@ -2274,6 +2320,16 @@
           },
           "404": {
             "description": "`NOT_FOUND` — unknown org id, project slug, or resource. Never distinguishes \"does not exist\" from \"not published\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`VALIDATION_ERROR` — `sort` is not one of the listed orders, `taxonomy` and `term` are not one non-blank value each, or `modifiedSince` is not a date-time with a zone; `fields` names the problem",
             "content": {
               "application/json": {
                 "schema": {
@@ -5508,7 +5564,7 @@
         ],
         "operationId": "getTaxonomy",
         "summary": "Get a taxonomy with a page of its terms",
-        "description": "The taxonomy plus one page of its terms, each with its active version's content inline.",
+        "description": "The taxonomy plus one page of its terms, each with its active version's content inline. `modifiedSince` narrows the terms and their `count`, while the taxonomy's `termCount` stays its total.",
         "parameters": [
           {
             "name": "org_id",
@@ -5551,6 +5607,15 @@
             "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
           },
           {
+            "name": "modifiedSince",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Lists only the rows with a `dateModified` at or after this instant, and `count` counts only those. An ISO 8601 date-time with a zone, like `2026-01-31T09:30:00Z`; anything else is a 422, and a `+` offset must be percent-encoded. Inclusive to the second, so a row can come back twice across builds but is not missed. It **cannot report removals**: a row that leaves the view, trashed or (in the published view) unpublished, just stops appearing, so pair it with a periodic full walk or with webhooks. An edit to a term or image a row references does not move the row's `dateModified`. Saving a draft of a published row moves it too, so a published read can return it with its content unchanged."
+          },
+          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -5569,7 +5634,7 @@
               "minimum": 1,
               "default": 1
             },
-            "description": "1-based page number. Ignored when `offset` is given."
+            "description": "1-based page number. Wins over `offset` when both are given."
           },
           {
             "name": "offset",
@@ -5578,7 +5643,7 @@
               "type": "integer",
               "minimum": 0
             },
-            "description": "Row offset — an alternative to `page`."
+            "description": "Row offset — an alternative to `page`, ignored when a valid `page` is given."
           }
         ],
         "responses": {
@@ -5638,6 +5703,16 @@
           },
           "404": {
             "description": "`NOT_FOUND` — unknown org id, project slug, or resource. Never distinguishes \"does not exist\" from \"not published\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`VALIDATION_ERROR` — `modifiedSince` is not a date-time with a zone; `fields` names the problem",
             "content": {
               "application/json": {
                 "schema": {
@@ -7524,7 +7599,12 @@
             "description": "Per-field-type options (choices, limits, …)."
           },
           "multiple": {
-            "type": "boolean"
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "`1` when the field holds an array of values."
           },
           "defaultValue": {
             "description": "Any JSON value."
@@ -8002,10 +8082,18 @@
             "description": "Any JSON value."
           },
           "locked": {
-            "type": "boolean"
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
           },
           "required": {
-            "type": "boolean"
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
           },
           "condition": {
             "type": [
@@ -8142,7 +8230,11 @@
             "description": "`published`, or `draft` in the working view (`?status=draft`)."
           },
           "versioningEnabled": {
-            "type": "boolean"
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
           },
           "dateCreated": {
             "type": "string",
@@ -8241,10 +8333,28 @@
             "description": "This binding's default — a value of the atom's own field shape (see `AtomWrite.defaultValue`)."
           },
           "locked": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "integer"
+            ],
+            "enum": [
+              true,
+              false,
+              0,
+              1
+            ]
           },
           "required": {
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "integer"
+            ],
+            "enum": [
+              true,
+              false,
+              0,
+              1
+            ]
           },
           "condition": {
             "type": [
@@ -8366,7 +8476,16 @@
             "description": "Editor layout: `style` atoms edit in the right rail, `content` / `media` in the canvas."
           },
           "multiple": {
-            "type": "boolean",
+            "type": [
+              "boolean",
+              "integer"
+            ],
+            "enum": [
+              true,
+              false,
+              0,
+              1
+            ],
             "default": false,
             "description": "An array of values instead of one."
           },
@@ -8470,7 +8589,16 @@
             "default": "draft"
           },
           "versioningEnabled": {
-            "type": "boolean",
+            "type": [
+              "boolean",
+              "integer"
+            ],
+            "enum": [
+              true,
+              false,
+              0,
+              1
+            ],
             "default": true,
             "description": "Keep a version history (fork on publish)."
           },
@@ -8608,7 +8736,11 @@
             "type": "string"
           },
           "multiple": {
-            "type": "boolean"
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
           },
           "value": {
             "description": "The configured value — any JSON value, `null` when unset."
@@ -9288,7 +9420,8 @@
           "uuid",
           "value",
           "locked",
-          "required"
+          "required",
+          "condition"
         ],
         "properties": {
           "uuid": {
@@ -9299,10 +9432,26 @@
             "description": "Any JSON value. An image field holds image uuid(s) — look them up in `referencedImages`. A file field holds media uuid(s) — look them up in `referencedFiles`; a non-uuid string there is an external URL written before file fields picked from the media library. A video field holds video uuid(s) — also in `referencedFiles` — and/or external video URLs (YouTube, Vimeo, …) as non-uuid strings."
           },
           "locked": {
-            "type": "boolean"
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
           },
           "required": {
-            "type": "boolean"
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "condition": {
+            "type": [
+              "object",
+              "string",
+              "null"
+            ],
+            "description": "The binding's visibility condition, `null` when it has none."
           }
         }
       },
@@ -9323,6 +9472,7 @@
           "dateCreated",
           "deduped"
         ],
+        "additionalProperties": false,
         "properties": {
           "uuid": {
             "type": "string",
@@ -9389,13 +9539,80 @@
       },
       "ReferencedImage": {
         "type": "object",
-        "description": "An image referenced by a version's image fields (content or root atoms), in the full image row shape (`castImageRow`). Carries at least the `Image` fields; other columns of the image row may be present.",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Image"
-          }
+        "description": "An image referenced by a version's image fields (content or root atoms), — `shapeReferencedImage` (`queries/images/cast-image-row.js`). The `Image` fields except `deduped`, which only an upload answers.",
+        "required": [
+          "uuid",
+          "title",
+          "alt",
+          "mime",
+          "sizeBytes",
+          "width",
+          "height",
+          "cdnUrl",
+          "thumb256Url",
+          "thumb1024Url",
+          "dateCreated"
         ],
-        "additionalProperties": true
+        "additionalProperties": false,
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "alt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mime": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "cdnUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "thumb256Url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "`null` until the async thumbnail job has run."
+          },
+          "thumb1024Url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "dateCreated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "ReferencedFile": {
         "type": "object",
@@ -9970,7 +10187,11 @@
             "description": "`published`, or `draft` in the working view (`?status=draft`). The detail read resolves the taxonomy in any live status — it is the namespace for its terms."
           },
           "versioningEnabled": {
-            "type": "boolean"
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
           },
           "dateCreated": {
             "type": "string",
@@ -10076,7 +10297,16 @@
             "default": "draft"
           },
           "versioningEnabled": {
-            "type": "boolean",
+            "type": [
+              "boolean",
+              "integer"
+            ],
+            "enum": [
+              true,
+              false,
+              0,
+              1
+            ],
             "default": true,
             "description": "Keep a version history of every term (fork on publish). Studio's create form defaults this off; the API takes the column default."
           },

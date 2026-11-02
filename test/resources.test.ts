@@ -73,7 +73,7 @@ describe('pages()', () => {
     expect(f).toHaveBeenCalledTimes(2)
   })
 
-  it('drops an offset, which would make the API ignore the page and never finish', async () => {
+  it('drops an offset, which earlier specs said wins over the page and would never finish', async () => {
     const f = fakeFetch(documentPage([row('a')], 1, 1))
     await collect(client(f).project('p').documents('post').pages({ offset: 5 } as never))
     expect(urlOf(f).searchParams.has('offset')).toBe(false)
@@ -129,9 +129,83 @@ describe('iterate()', () => {
   })
 })
 
+describe('list filters', () => {
+  const documents = (f: typeof fetch) => client(f).project('p').documents('post')
+
+  it('sends sort, taxonomy and term as the spec names them', async () => {
+    const f = fakeFetch(documentPage([], 1, 0))
+    await documents(f).list({ sort: '-datePublished', taxonomy: 'topics', term: 'news' })
+    expect(urlOf(f).search).toBe('?sort=-datePublished&taxonomy=topics&term=news')
+  })
+
+  it('percent-encodes a + offset in modifiedSince, which the API would read as a space', async () => {
+    const f = fakeFetch(documentPage([], 1, 0))
+    await documents(f).list({ modifiedSince: '2026-01-31T09:30:00+02:00' })
+    expect(urlOf(f).search).toBe('?modifiedSince=2026-01-31T09%3A30%3A00%2B02%3A00')
+    expect(urlOf(f).searchParams.get('modifiedSince')).toBe('2026-01-31T09:30:00+02:00')
+  })
+
+  it('sends a Date as its ISO 8601 UTC instant', async () => {
+    const f = fakeFetch(documentPage([], 1, 0))
+    await documents(f).list({ modifiedSince: new Date(Date.UTC(2026, 0, 31, 9, 30)) })
+    expect(urlOf(f).searchParams.get('modifiedSince')).toBe('2026-01-31T09:30:00.000Z')
+  })
+
+  it('refuses an invalid Date with a TypeError naming the parameter, and sends nothing', async () => {
+    const f = fakeFetch(documentPage([], 1, 0))
+    await expect(documents(f).list({ modifiedSince: new Date('not a date') })).rejects.toThrow(new TypeError('modifiedSince must be a valid Date'))
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('keeps every filter on every page of a walk', async () => {
+    const f = fakeFetch(documentPage([row('a'), row('b')], 1, 3), documentPage([row('c')], 2, 3))
+    const since = new Date(Date.UTC(2026, 0, 31))
+    const rows = await collect(documents(f).iterate({ limit: 2, sort: 'title', taxonomy: 'topics', term: 'news', modifiedSince: since }))
+    expect(rows.map(r => r.uuid)).toEqual(['a', 'b', 'c'])
+    for (const call of [0, 1]) {
+      const params = urlOf(f, call).searchParams
+      expect([params.get('sort'), params.get('taxonomy'), params.get('term'), params.get('modifiedSince'), params.get('page')])
+        .toEqual(['title', 'topics', 'news', '2026-01-31T00:00:00.000Z', String(call + 1)])
+    }
+  })
+
+  it('passes modifiedSince to a term list, through list() and pages()', async () => {
+    const page = { taxonomy: {}, terms: { results: [], count: 0, limit: 50, offset: 0, page: 1 }, referencedImages: [], referencedFiles: [] }
+    const f = fakeFetch(page)
+    const terms = client(f).project('p').terms('tag')
+    await terms.list({ modifiedSince: new Date(Date.UTC(2026, 0, 31)) })
+    await collect(terms.pages({ modifiedSince: '2026-01-31T00:00:00Z', status: 'draft' }))
+    expect(urlOf(f, 0).search).toBe('?modifiedSince=2026-01-31T00%3A00%3A00.000Z')
+    expect(urlOf(f, 1).searchParams.get('modifiedSince')).toBe('2026-01-31T00:00:00Z')
+    expect(urlOf(f, 1).searchParams.get('status')).toBe('draft')
+  })
+
+  it('types the filters each list takes, and refuses the rest', () => {
+    // Compile-time only (`npm run typecheck`): never called.
+    const typed = (hv: ReturnType<typeof client>) => {
+      const posts = hv.project('p').documents('post')
+      const tags = hv.project('p').terms('tag')
+      void posts.list({ sort: 'dateModified', taxonomy: 't', term: 'x', modifiedSince: new Date() })
+      void posts.pages({ sort: '-title', modifiedSince: '2026-01-31T00:00:00Z' })
+      void tags.iterate({ modifiedSince: new Date() })
+      // @ts-expect-error not one of the listed orders
+      void posts.list({ sort: 'slug' })
+      // @ts-expect-error modifiedSince is a string or a Date
+      void posts.list({ modifiedSince: 1767225600000 })
+      // @ts-expect-error a term list has no sort
+      void tags.list({ sort: 'title' })
+      // @ts-expect-error a term list is not filtered by term
+      void tags.list({ term: 'x' })
+      // @ts-expect-error the project list has no modifiedSince
+      void hv.projects.list({ modifiedSince: new Date() })
+    }
+    expect(typed).toBeTypeOf('function')
+  })
+})
+
 describe('root atoms', () => {
   it('passes both shapes through untouched: an array on read, a uuid-keyed object on write', async () => {
-    const read = { document: {}, version: { rootAtoms: [{ uuid: 'atom-1', value: 'x', locked: false, required: true }] }, taxonomies: [], referencedImages: [], referencedFiles: [] }
+    const read = { document: {}, version: { rootAtoms: [{ uuid: 'atom-1', value: 'x', locked: 0, required: 1, condition: null }] }, taxonomies: [], referencedImages: [], referencedFiles: [] }
     const f = fakeFetch(read)
     const docs = client(f).project('p').documents('post')
     expect(await docs.get('hello')).toEqual(read)

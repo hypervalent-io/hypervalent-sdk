@@ -526,7 +526,7 @@ export interface paths {
         };
         /**
          * Get a taxonomy with a page of its terms
-         * @description The taxonomy plus one page of its terms, each with its active version's content inline.
+         * @description The taxonomy plus one page of its terms, each with its active version's content inline. `modifiedSince` narrows the terms and their `count`, while the taxonomy's `termCount` stays its total.
          */
         get: operations["getTaxonomy"];
         put?: never;
@@ -820,7 +820,11 @@ export interface components {
             fieldConfig: {
                 [key: string]: unknown;
             } | null;
-            multiple: boolean;
+            /**
+             * @description `1` when the field holds an array of values.
+             * @enum {integer}
+             */
+            multiple: 0 | 1;
             /** @description Any JSON value. */
             defaultValue: unknown;
         };
@@ -953,8 +957,10 @@ export interface components {
             uuid: string;
             /** @description Any JSON value. */
             defaultValue: unknown;
-            locked: boolean;
-            required: boolean;
+            /** @enum {integer} */
+            locked: 0 | 1;
+            /** @enum {integer} */
+            required: 0 | 1;
             /** @description Visibility condition, when one is set. */
             condition?: Record<string, never> | string | null;
         };
@@ -988,7 +994,8 @@ export interface components {
              * @enum {string}
              */
             status: "draft" | "published";
-            versioningEnabled: boolean;
+            /** @enum {integer} */
+            versioningEnabled: 0 | 1;
             /** Format: date-time */
             dateCreated: string;
             /** Format: date-time */
@@ -1025,8 +1032,10 @@ export interface components {
             uuid: string;
             /** @description This binding's default — a value of the atom's own field shape (see `AtomWrite.defaultValue`). */
             defaultValue?: unknown;
-            locked?: boolean;
-            required?: boolean;
+            /** @enum {boolean|integer} */
+            locked?: true | false | 0 | 1;
+            /** @enum {boolean|integer} */
+            required?: true | false | 0 | 1;
             /** @description Show this field only while a sibling binding matches: `{ when: <uuid of another atom in this list>, operator: equals | notEquals | isEmpty | isNotEmpty, value? }` (`value` required for equals / notEquals). */
             condition?: {
                 /** Format: uuid */
@@ -1076,8 +1085,9 @@ export interface components {
             /**
              * @description An array of values instead of one.
              * @default false
+             * @enum {boolean|integer}
              */
-            multiple: boolean;
+            multiple: true | false | 0 | 1;
             /** @description Only the keys the field type reads: select `options` (required — `[{ value, text?, selected? }]` or strings); number / range `min`, `max`, `step`; html `toolbar` (the toolbar switches, `headings: [1–6]`); image `dragDropEnabled`; image / file / video `maxFileSizeBytes`. Any other key is refused. */
             fieldConfig?: {
                 [key: string]: unknown;
@@ -1119,8 +1129,9 @@ export interface components {
             /**
              * @description Keep a version history (fork on publish).
              * @default true
+             * @enum {boolean|integer}
              */
-            versioningEnabled: boolean;
+            versioningEnabled: true | false | 0 | 1;
             /** @description The root atoms (top-level fields) of a document of this type. */
             atoms?: components["schemas"]["AtomBindingWrite"][];
             /** @description Published molecules a document's content tree may hold at the top level. */
@@ -1158,7 +1169,8 @@ export interface components {
             title: string;
             description: string | null;
             fieldType: string;
-            multiple: boolean;
+            /** @enum {integer} */
+            multiple: 0 | 1;
             /** @description The configured value — any JSON value, `null` when unset. */
             value: unknown;
         };
@@ -1386,8 +1398,12 @@ export interface components {
             uuid: string;
             /** @description Any JSON value. An image field holds image uuid(s) — look them up in `referencedImages`. A file field holds media uuid(s) — look them up in `referencedFiles`; a non-uuid string there is an external URL written before file fields picked from the media library. A video field holds video uuid(s) — also in `referencedFiles` — and/or external video URLs (YouTube, Vimeo, …) as non-uuid strings. */
             value: unknown;
-            locked: boolean;
-            required: boolean;
+            /** @enum {integer} */
+            locked: 0 | 1;
+            /** @enum {integer} */
+            required: 0 | 1;
+            /** @description The binding's visibility condition, `null` when it has none. */
+            condition: Record<string, never> | string | null;
         };
         /** @description The public image shape — `shapePublicImage` (`routes/media.js`). `cdnUrl` and the thumbnails are absolute CDN URLs. */
         Image: {
@@ -1413,10 +1429,28 @@ export interface components {
             /** @description `true` when an upload matched an existing image by content hash and the existing row was returned. */
             deduped: boolean;
         };
-        /** @description An image referenced by a version's image fields (content or root atoms), in the full image row shape (`castImageRow`). Carries at least the `Image` fields; other columns of the image row may be present. */
+        /** @description An image referenced by a version's image fields (content or root atoms), — `shapeReferencedImage` (`queries/images/cast-image-row.js`). The `Image` fields except `deduped`, which only an upload answers. */
         ReferencedImage: {
-            [key: string]: unknown;
-        } & components["schemas"]["Image"];
+            /** Format: uuid */
+            uuid: string;
+            title: string | null;
+            alt: string | null;
+            mime: string;
+            sizeBytes: number;
+            width: number | null;
+            height: number | null;
+            /** Format: uri */
+            cdnUrl: string;
+            /**
+             * Format: uri
+             * @description `null` until the async thumbnail job has run.
+             */
+            thumb256Url: string | null;
+            /** Format: uri */
+            thumb1024Url: string | null;
+            /** Format: date-time */
+            dateCreated: string;
+        };
         /** @description A media-library file or video referenced by a version's file or video fields (content or root atoms) — `shapeReferencedFile` (`queries/images/cast-image-row.js`). `url` is the absolute CDN URL. */
         ReferencedFile: {
             /** Format: uuid */
@@ -1582,7 +1616,8 @@ export interface components {
              * @enum {string}
              */
             status: "draft" | "published";
-            versioningEnabled: boolean;
+            /** @enum {integer} */
+            versioningEnabled: 0 | 1;
             /** Format: date-time */
             dateCreated: string;
             /** Format: date-time */
@@ -1623,8 +1658,9 @@ export interface components {
             /**
              * @description Keep a version history of every term (fork on publish). Studio's create form defaults this off; the API takes the column default.
              * @default true
+             * @enum {boolean|integer}
              */
-            versioningEnabled: boolean;
+            versioningEnabled: true | false | 0 | 1;
             /** @description The root atoms (top-level fields) of a term of this taxonomy. */
             atoms?: components["schemas"]["AtomBindingWrite"][];
             /** @description Published molecules a term's content tree may hold at the top level. */
@@ -1773,9 +1809,9 @@ export interface operations {
             query?: {
                 /** @description Page size, clamped to the server maximum (50). */
                 limit?: number;
-                /** @description 1-based page number. Ignored when `offset` is given. */
+                /** @description 1-based page number. Wins over `offset` when both are given. */
                 page?: number;
-                /** @description Row offset — an alternative to `page`. */
+                /** @description Row offset — an alternative to `page`, ignored when a valid `page` is given. */
                 offset?: number;
             };
             header?: never;
@@ -3090,11 +3126,19 @@ export interface operations {
             query?: {
                 /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
                 status?: "published" | "draft";
+                /** @description The order of the list; a leading `-` reverses it. Every order breaks ties the same way, so offset paging stays deterministic. A document with no `datePublished` (a never-published draft in the `status=draft` view) sorts as the oldest: first ascending, last descending. */
+                sort?: "title" | "-title" | "datePublished" | "-datePublished" | "dateModified" | "-dateModified";
+                /** @description The slug of the taxonomy that owns `term`. Send both or neither. */
+                taxonomy?: string;
+                /** @description Lists only the documents tagged with this term, and `count` counts only those. Tags belong to a version, so a published read matches the active version's tags and `status=draft` the working version's. A term this read cannot see answers 404, the same as an unknown slug. */
+                term?: string;
+                /** @description Lists only the rows with a `dateModified` at or after this instant, and `count` counts only those. An ISO 8601 date-time with a zone, like `2026-01-31T09:30:00Z`; anything else is a 422, and a `+` offset must be percent-encoded. Inclusive to the second, so a row can come back twice across builds but is not missed. It **cannot report removals**: a row that leaves the view, trashed or (in the published view) unpublished, just stops appearing, so pair it with a periodic full walk or with webhooks. An edit to a term or image a row references does not move the row's `dateModified`. Saving a draft of a published row moves it too, so a published read can return it with its content unchanged. */
+                modifiedSince?: string;
                 /** @description Page size, clamped to the server maximum (50). */
                 limit?: number;
-                /** @description 1-based page number. Ignored when `offset` is given. */
+                /** @description 1-based page number. Wins over `offset` when both are given. */
                 page?: number;
-                /** @description Row offset — an alternative to `page`. */
+                /** @description Row offset — an alternative to `page`, ignored when a valid `page` is given. */
                 offset?: number;
             };
             header?: never;
@@ -3148,6 +3192,15 @@ export interface operations {
             };
             /** @description `NOT_FOUND` — unknown org id, project slug, or resource. Never distinguishes "does not exist" from "not published". */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` — `sort` is not one of the listed orders, `taxonomy` and `term` are not one non-blank value each, or `modifiedSince` is not a date-time with a zone; `fields` names the problem */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5218,11 +5271,13 @@ export interface operations {
             query?: {
                 /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
                 status?: "published" | "draft";
+                /** @description Lists only the rows with a `dateModified` at or after this instant, and `count` counts only those. An ISO 8601 date-time with a zone, like `2026-01-31T09:30:00Z`; anything else is a 422, and a `+` offset must be percent-encoded. Inclusive to the second, so a row can come back twice across builds but is not missed. It **cannot report removals**: a row that leaves the view, trashed or (in the published view) unpublished, just stops appearing, so pair it with a periodic full walk or with webhooks. An edit to a term or image a row references does not move the row's `dateModified`. Saving a draft of a published row moves it too, so a published read can return it with its content unchanged. */
+                modifiedSince?: string;
                 /** @description Page size, clamped to the server maximum (50). */
                 limit?: number;
-                /** @description 1-based page number. Ignored when `offset` is given. */
+                /** @description 1-based page number. Wins over `offset` when both are given. */
                 page?: number;
-                /** @description Row offset — an alternative to `page`. */
+                /** @description Row offset — an alternative to `page`, ignored when a valid `page` is given. */
                 offset?: number;
             };
             header?: never;
@@ -5276,6 +5331,15 @@ export interface operations {
             };
             /** @description `NOT_FOUND` — unknown org id, project slug, or resource. Never distinguishes "does not exist" from "not published". */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` — `modifiedSince` is not a date-time with a zone; `fields` names the problem */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
