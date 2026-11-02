@@ -2,7 +2,7 @@
 
 TypeScript client for the Hypervalent public API. Node 22+, modern browsers, Cloudflare Workers, Deno and Bun, with zero runtime dependencies.
 
-> **Status: early.** The package covers every public API operation and webhook verification. Its first npm release, 0.1.0, is prepared and not yet published.
+> **Status: early.** The package covers every public API operation and webhook verification. 0.1.0 is on npm with provenance: `npm install --save-exact @hypervalent-io/sdk`. Until 1.0, a minor release can break the API, so pin the version.
 
 ## Usage
 
@@ -84,6 +84,8 @@ await posts.update('hello', { rootAtoms: { [atomUuid]: 'New value' } })
 With a [generated schema](#typed-content), reads and writes use field slugs instead.
 
 ### Typed content
+
+> **Unreleased.** `typegen` and the `schema` option are on `main` and not in 0.1.0; they ship in the next release.
 
 `typegen` reads one project's content model and writes a typed schema. It is a value, not only types, because a field slug becomes an atom uuid at run time:
 
