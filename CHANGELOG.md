@@ -2,6 +2,12 @@
 
 Each release of `@hypervalent-io/sdk` has a section here, and a `vX.Y.Z` tag cannot publish without one. Before 1.0.0 a minor version may break the client's API.
 
+## Unreleased
+
+Ships as a 1.x minor after 1.0.
+
+- `npx @hypervalent-io/sdk typegen`, and `createClient({ schema })`: documents and terms read and write fields by slug with real value types, in one project
+
 ## 0.1.0
 
 First release.

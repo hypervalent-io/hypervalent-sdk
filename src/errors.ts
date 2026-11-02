@@ -6,6 +6,8 @@ export type SdkErrorCode
     | 'UNEXPECTED_RESPONSE'
     | 'BROWSER_WRITE_UNSUPPORTED'
     | 'PROJECT_REQUIRED'
+    | 'SCHEMA_PROJECT_MISMATCH'
+    | 'SCHEMA_VALIDATION'
 
 /** Codes the public API documents. */
 export type ApiErrorCode

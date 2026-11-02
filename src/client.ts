@@ -1,5 +1,6 @@
 import { HypervalentError } from './errors'
-import { type ClientResources, clientResources, segment } from './resources'
+import { type ClientResources, clientResources, type ProjectResources, segment } from './resources'
+import { isProjectSchema, type ProjectSchema, type SchemaTypes, type TypedDocumentsResource, typedProject, type TypedTermsResource } from './schema'
 import { abortable, assertWriteAllowed, type HttpMethod, type HypervalentResponse, isRead, send, type SendOptions, type TransportConfig } from './transport'
 
 export interface ClientOptions<Schema = unknown> {
@@ -17,7 +18,10 @@ export interface ClientOptions<Schema = unknown> {
   maxRetryDelayMs?: number
   /** Defaults to the global fetch. For tests, proxies and local TLS. */
   fetch?: typeof fetch
-  /** Reserved for the typegen CLI: accepted, with no behavior yet. */
+  /**
+   * What `npx @hypervalent-io/sdk typegen` generated. Documents and terms then read
+   * and write fields by slug, with real value types, in that one project.
+   */
   schema?: Schema
 }
 
@@ -26,7 +30,20 @@ export interface RequestOptions extends SendOptions {
   orgless?: boolean
 }
 
-export interface HypervalentClient<Schema = unknown> extends ClientResources {
+/** `ProjectResources` under a schema: documents and terms are typed, the rest unchanged. */
+export type TypedProjectResources<T extends SchemaTypes> = Omit<ProjectResources, 'documents' | 'terms'> & {
+  documents<D extends keyof T['doctypes'] & string>(doctype: D): TypedDocumentsResource<T, T['doctypes'][D]>
+  terms<X extends keyof T['taxonomies'] & string>(taxonomy: X): TypedTermsResource<T, T['taxonomies'][X]>
+}
+
+type Resources<Schema> = [Schema] extends [ProjectSchema<infer T>]
+  ? Omit<ClientResources, 'project'> & {
+    /** Omitted, the slug is the narrowed token's, or else the schema's own. */
+    project(slug?: string): TypedProjectResources<T>
+  }
+  : ClientResources
+
+export type HypervalentClient<Schema = unknown> = Resources<Schema> & {
   readonly schema: Schema | undefined
   /**
    * Calls any public route. `path` is relative to `/v1/orgs/:org` and is not
@@ -132,5 +149,49 @@ export function createClient<Schema = unknown>(options: ClientOptions<Schema>): 
     return send<T>(config, method, url.href, sendOptions)
   }
 
-  return { schema, request, ...clientResources(request, tokenProjectSlug) }
+  // Anything else keeps the untyped behavior 1.0 promises, so typegen stays additive (docs/sdk.md §7).
+  if (!isProjectSchema(schema)) return { schema, request, ...clientResources(request, tokenProjectSlug) } as unknown as HypervalentClient<Schema>
+  const projectSchema: ProjectSchema = schema
+
+  const schemaProjectSlug = async (signal?: AbortSignal) => (await resolveIdentity(signal)).projectSlug || projectSchema.project.slug
+  const resources = clientResources(request, schemaProjectSlug)
+  const verified = new Map<string, Promise<void>>()
+
+  /** The schema's uuids mean nothing in another project, and its slug is no proof: another org can use the same one. */
+  async function checkProject(slug: string) {
+    for await (const project of resources.projects.iterate()) {
+      if (project.slug !== slug) continue
+      if (project.uuid === projectSchema.project.uuid) return
+      break
+    }
+    throw new HypervalentError({
+      status: 0,
+      code: 'SCHEMA_PROJECT_MISMATCH',
+      message: `This schema was generated for project '${projectSchema.project.slug}' (${projectSchema.project.uuid}), and project '${slug}' is not that project. Run typegen for it, or create a client without this schema.`
+    })
+  }
+
+  function verifyProject(slug: string | undefined) {
+    return async (signal?: AbortSignal) => {
+      const name = slug ?? await schemaProjectSlug(signal)
+      let check = verified.get(name)
+      if (!check) {
+        const pending = checkProject(name)
+        check = pending
+        verified.set(name, pending)
+        // A failure is not remembered: the next call checks again.
+        pending.catch(() => {
+          if (verified.get(name) === pending) verified.delete(name)
+        })
+      }
+      await abortable(check, signal)
+    }
+  }
+
+  return {
+    schema,
+    request,
+    ...resources,
+    project: (slug?: string) => typedProject(projectSchema, resources.project(slug), verifyProject(slug))
+  } as unknown as HypervalentClient<Schema>
 }

@@ -45,12 +45,15 @@
     },
     "./package.json": "./package.json"
   },
+  "bin": {
+    "hypervalent-sdk": "./dist/cli.js"
+  },
   "files": [
     "dist",
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsup --config tsup.cli.config.ts",
     "generate": "node scripts/generate.mjs",
     "check": "node scripts/generate.mjs --check",
     "lint": "eslint . --fix",

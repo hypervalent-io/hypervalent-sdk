@@ -81,6 +81,40 @@ const { version } = await posts.get('hello')    // version.rootAtoms: [{ uuid, v
 await posts.update('hello', { rootAtoms: { [atomUuid]: 'New value' } })
 ```
 
+With a [generated schema](#typed-content), reads and writes use field slugs instead.
+
+### Typed content
+
+`typegen` reads one project's content model and writes a typed schema. It is a value, not only types, because a field slug becomes an atom uuid at run time:
+
+```bash
+HYPERVALENT_TOKEN=atk_… npx @hypervalent-io/sdk typegen --project marketing --out src/hypervalent.schema.ts
+```
+
+```ts
+import { createClient } from '@hypervalent-io/sdk'
+import { schema } from './hypervalent.schema'
+
+const site = createClient({ token, schema }).project()
+const posts = site.documents('post')
+
+await posts.create({
+  title: 'Hello',
+  rootAtoms: { headline: 'Hi', hero: [imageUuid] },
+  blocks: [{ molecule: 'card', atoms: { headline: 'Nested' } }]
+})
+const { version } = await posts.get('hello')
+version?.rootAtoms.headline     // string | null
+version?.blocks                 // the content tree, with molecule slugs
+```
+
+**The output is a snapshot, and runtime values are not validated against it.** An edit in Studio can make it stale, so run `typegen` again when the content model changes. A field added since is in `unmappedRootAtoms`, and a molecule added since reads as `molecule: null`. Image, file and video fields are always arrays of strings.
+
+- A write that does not fit is refused before any request with `SCHEMA_VALIDATION`, whose `fields` names every problem.
+- The schema belongs to one project. Used with any other, `documents()` and `terms()` throw `SCHEMA_PROJECT_MISMATCH` rather than send its uuids. That check costs one read of the project list per client.
+- `--status draft` generates from the working structure and needs a `read_write` token on a plan with API writes. Any other token sees published structure only.
+- `taxonomyTerms` still takes term uuids.
+
 ### Media
 
 ```ts
@@ -161,14 +195,14 @@ npm run verify   # lint, check, typecheck, test, build, Node smoke, Workers bund
 |---|---|
 | `npm run generate` | Regenerates `src/generated/` from `openapi.json` |
 | `npm run check` | Fails if `src/generated/` differs from a fresh generation |
-| `npm run build` | Builds ESM and CJS with type declarations into `dist/` |
+| `npm run build` | Builds ESM and CJS with type declarations into `dist/`, then the CLI |
 | `npm run lint` / `lint:ci` | ESLint, fixing / not fixing |
 | `npm run typecheck` | `tsc` over the source and the tests |
 | `npm test` | Vitest, including the webhook verifier running in workerd |
 | `npm run smoke` | Imports the built package in Node, as ESM and CJS |
 | `npm run check:workers` | Bundles the built package for Workers, failing on any Node built-in |
 | `npm run check:release` | Fails unless `package.json` and `CHANGELOG.md` are ready to release |
-| `npm run check:package` | Installs the packed tarball in a new project and runs a read from it, as ESM and CJS, against a local server |
+| `npm run check:package` | Installs the packed tarball in a new project and runs a read from it, as ESM and CJS, and its CLI, against a local server |
 | `npm run release:dry-run` | `npm publish --dry-run`: shows what would ship and publishes nothing |
 | `npm run spec:drift` | Compares `openapi.json` with the published spec |
 | `npm run spec:sync` | Replaces `openapi.json` with the published spec and regenerates |
