@@ -1,0 +1,85 @@
+# A vX.Y.Z tag publishes that commit to npm with trusted publishing (OIDC) and
+# provenance. There is no npm token anywhere: npm's trusted publisher config
+# names this file, so renaming it breaks publishing until that config changes.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Builds and tests with no publish rights, so dependency code that runs here
+  # never sees an id-token. The publish job only handles the resulting tarball.
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require the tag to be on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check the tag against package.json and the changelog
+        run: node scripts/check-release.mjs "$GITHUB_REF_NAME"
+      - run: npm ci
+      - run: npm run verify
+      # --ignore-scripts packs the dist/ that verify just tested. It also keeps
+      # prepack's build output out of stdout, which must be only the JSON.
+      - id: pack
+        name: Pack
+        run: echo "tarball=$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 bundles npm 10.
+      - run: npm install -g npm@11.21.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+      - name: Publish
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+        run: npm publish "./$TARBALL" --access public --provenance
+      # npm can take a moment to serve a new version, so this waits for it.
+      - name: Confirm the provenance attestation
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            attestation="$(npm view "@hypervalent-io/sdk@$version" dist.attestations.provenance.predicateType || true)"
+            if [ -n "$attestation" ]; then
+              echo "$version has provenance: $attestation"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::$version has no provenance attestation on npm"
+          exit 1
