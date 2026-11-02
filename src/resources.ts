@@ -5,7 +5,24 @@ import { assertWriteAllowed, type HttpMethod, type HypervalentResponse, type Que
 
 type Schemas = components['schemas']
 export type Answer<Op extends keyof operations> = operations[Op] extends { responses: { 200: { content: { 'application/json': infer T } } } } ? T : never
-type Query<Op extends keyof operations> = NonNullable<operations[Op]['parameters']['query']>
+type Query<Op extends keyof operations> = Dated<NonNullable<operations[Op]['parameters']['query']>>
+/** `modifiedSince` also takes a `Date`, sent as its ISO 8601 UTC instant. */
+type Dated<Q> = Q extends unknown
+  ? 'modifiedSince' extends keyof Q ? Omit<Q, 'modifiedSince'> & {
+    /**
+     * Only rows with a `dateModified` at or after this instant: an ISO 8601 date-time with a zone, or a `Date`.
+     * Inclusive to the second. It **cannot report removals**: a trashed or unpublished row just stops appearing.
+     */
+    modifiedSince?: string | Date
+  } : Q
+  : never
+
+/** A query value, with a `Date` as its ISO 8601 UTC instant. An invalid `Date` is a `TypeError`, not the 422 its `toISOString()` would never reach. */
+function queryValue(key: string, value: QueryValue | Date): QueryValue {
+  if (!(value instanceof Date)) return value
+  if (Number.isNaN(value.getTime())) throw new TypeError(`${key} must be a valid Date`)
+  return value.toISOString()
+}
 
 /** Taken by every method. */
 export interface CallOptions {
@@ -152,8 +169,10 @@ type Extra = Pick<SendOptions, 'body' | 'accept'> & { orgless?: boolean }
 
 /** Splits a method's options into the transport's and the query, and answers the body. */
 async function send<T>(request: RequestFn, method: HttpMethod, path: string, options: CallOptions = {}, extra: Extra = {}): Promise<T> {
-  const { signal, timeoutMs, ...query } = options
-  const transport: SendOptions & Extra = { ...extra, query: query as Record<string, QueryValue> }
+  const { signal, timeoutMs, ...rest } = options as CallOptions & Record<string, QueryValue | Date>
+  const query: Record<string, QueryValue> = {}
+  for (const [key, value] of Object.entries(rest)) query[key] = queryValue(key, value)
+  const transport: SendOptions & Extra = { ...extra, query }
   if (signal) transport.signal = signal
   if (timeoutMs !== undefined) transport.timeoutMs = timeoutMs
   return (await request<T>(method, path, transport)).body
@@ -168,7 +187,8 @@ function paged<Op extends keyof operations, Row extends { uuid: string }>(
     for (let page = 1; ; page++) {
       const query = { limit: MAX_PAGE_SIZE, ...options, page } as WalkOptions<Op> & { limit?: number, page: number, offset?: number }
       query.limit ??= MAX_PAGE_SIZE
-      // For callers without types: the walk drives `page`, and the spec says `page` loses to an `offset`.
+      // For callers without types: the walk drives `page`. Spec 1.5.0 says a valid `page` wins over an
+      // `offset`, and earlier specs said the reverse, so the walk sends none.
       delete query.offset
       const answer = await read(query as unknown as ReadOptions<Op>)
       const { results, count, offset } = info(answer)
