@@ -13,7 +13,11 @@ const BANNER = `// GENERATED from openapi.json by scripts/generate.mjs. Do not e
 /** Generated file contents for a spec, keyed by path relative to the package root. */
 export async function renderWireTypes(specPath) {
   const spec = JSON.parse(await readFile(specPath, 'utf8'))
-  const ast = await openapiTS(pathToFileURL(specPath))
+  // openapi-typescript's defaultNonNullable (on by default) makes every property with a `default`
+  // required. In this spec only write bodies declare property defaults (parameter defaults do not
+  // change a parameter's optionality), and a default there is what the API fills in when the field
+  // is omitted, so it must stay optional (CMS-772).
+  const ast = await openapiTS(pathToFileURL(specPath), { defaultNonNullable: false })
   const ids = operationIds(spec).map(id => `  ${JSON.stringify(id)}`).join(',\n')
   return {
     'src/generated/openapi.ts': `${BANNER}\n${astToString(ast)}`,

@@ -22,6 +22,39 @@ describe('generated wire types', () => {
     expect([...OPERATION_IDS].sort()).toEqual([...ids].sort())
     expect(SPEC_VERSION).toBe(spec.info.version)
   })
+
+  // CMS-772: a `default` is what the API fills in, so it must not make a write field required.
+  it('keeps a property with a default optional unless the spec requires it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'sdk-defaults-'))
+    try {
+      const specPath = join(root, 'spec.json')
+      await writeFile(specPath, JSON.stringify({
+        openapi: '3.1.0',
+        info: { title: 'defaults', version: '1.0.0' },
+        paths: {},
+        components: {
+          schemas: {
+            Write: {
+              type: 'object',
+              required: ['title', 'pinned'],
+              properties: {
+                title: { type: 'string' },
+                status: { type: 'string', default: 'draft' },
+                pinned: { type: 'boolean', default: false }
+              }
+            }
+          }
+        }
+      }))
+      const types = (await renderWireTypes(specPath))[OPENAPI_TS]
+      expect(types).toMatch(/\btitle: string;/)
+      expect(types).toMatch(/\bstatus\?: string;/)
+      expect(types).toMatch(/\bpinned: boolean;/)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('check', () => {
