@@ -2,6 +2,12 @@
 
 Each release of `@hypervalent-io/sdk` has a section here, and a `vX.Y.Z` tag cannot publish without one. Before 1.0.0 a minor version may break the client's API.
 
+## 0.2.1
+
+Write bodies no longer require the fields the API defaults.
+
+- `atoms.create()` and `.update()` may leave out `status`, `category` and `multiple`; `molecules` may leave out `status`; `doctypes` and `taxonomies` may leave out `status` and `versioningEnabled`. A create gets the default and an update keeps the current value, as before. 0.1.0 and 0.2.0 typed them as required because the generator treated a spec `default` as required; the spec itself never did
+
 ## 0.2.0
 
 Typed list filters, the typegen CLI, and wire types synced to API spec 1.5.0.

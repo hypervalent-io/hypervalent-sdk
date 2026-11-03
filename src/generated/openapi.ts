@@ -1073,7 +1073,7 @@ export interface components {
              * @default draft
              * @enum {string}
              */
-            status: "draft" | "published";
+            status?: "draft" | "published";
             /** @enum {string} */
             fieldType: "text" | "textarea" | "html" | "markdown" | "number" | "color" | "image" | "select" | "range" | "spacing" | "date" | "boolean" | "icon" | "link" | "video" | "file" | "email" | "tel" | "slug";
             /**
@@ -1081,13 +1081,13 @@ export interface components {
              * @default content
              * @enum {string}
              */
-            category: "style" | "content" | "media";
+            category?: "style" | "content" | "media";
             /**
              * @description An array of values instead of one.
              * @default false
              * @enum {boolean|integer}
              */
-            multiple: true | false | 0 | 1;
+            multiple?: true | false | 0 | 1;
             /** @description Only the keys the field type reads: select `options` (required — `[{ value, text?, selected? }]` or strings); number / range `min`, `max`, `step`; html `toolbar` (the toolbar switches, `headings: [1–6]`); image `dragDropEnabled`; image / file / video `maxFileSizeBytes`. Any other key is refused. */
             fieldConfig?: {
                 [key: string]: unknown;
@@ -1106,7 +1106,7 @@ export interface components {
              * @default draft
              * @enum {string}
              */
-            status: "draft" | "published";
+            status?: "draft" | "published";
             atoms?: components["schemas"]["AtomBindingWrite"][];
             /** @description Published molecules of this project that may nest inside this one. */
             supports?: string[];
@@ -1125,13 +1125,13 @@ export interface components {
              * @default draft
              * @enum {string}
              */
-            status: "draft" | "published";
+            status?: "draft" | "published";
             /**
              * @description Keep a version history (fork on publish).
              * @default true
              * @enum {boolean|integer}
              */
-            versioningEnabled: true | false | 0 | 1;
+            versioningEnabled?: true | false | 0 | 1;
             /** @description The root atoms (top-level fields) of a document of this type. */
             atoms?: components["schemas"]["AtomBindingWrite"][];
             /** @description Published molecules a document's content tree may hold at the top level. */
@@ -1654,13 +1654,13 @@ export interface components {
              * @default draft
              * @enum {string}
              */
-            status: "draft" | "published";
+            status?: "draft" | "published";
             /**
              * @description Keep a version history of every term (fork on publish). Studio's create form defaults this off; the API takes the column default.
              * @default true
              * @enum {boolean|integer}
              */
-            versioningEnabled: true | false | 0 | 1;
+            versioningEnabled?: true | false | 0 | 1;
             /** @description The root atoms (top-level fields) of a term of this taxonomy. */
             atoms?: components["schemas"]["AtomBindingWrite"][];
             /** @description Published molecules a term's content tree may hold at the top level. */
