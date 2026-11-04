@@ -415,13 +415,13 @@ describe('the CLI', () => {
     expect(refused.err.join('')).not.toContain('atk_secret')
   })
 
-  it('refuses --status draft on a read token, which the API would answer with published structure', async () => {
+  it('refuses --status draft on a read token, which the API would refuse with a 403', async () => {
     const streams = io()
     expect(await run(['typegen', '--project', 'site', '--out', '/nonexistent/x.ts', '--status', 'draft'], { ...streams, fetch: routes(undefined, 'read') })).toBe(1)
     expect(streams.err.join('')).toContain('TOKEN_SCOPE_READ_ONLY')
   })
 
-  it('refuses --status draft on a read_write token whose plan has no API writes, which the API also answers with published structure', async () => {
+  it('refuses --status draft on a read_write token whose plan has no API writes, which the API also refuses', async () => {
     const streams = io()
     expect(await run(['typegen', '--project', 'site', '--out', '/nonexistent/x.ts', '--status', 'draft'], { ...streams, fetch: routes(undefined, 'read_write', false) })).toBe(1)
     expect(streams.err.join('')).toContain('TOKEN_SCOPE_READ_ONLY')

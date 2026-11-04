@@ -159,9 +159,10 @@ export const schema = defineSchema<HypervalentFields>(${JSON.stringify(schema, n
 export async function readCatalog(hv: ClientResources, options: { project?: string, status?: 'published' | 'draft' } = {}): Promise<Catalog> {
   const status = options.status ?? 'published'
   const { token, features } = await hv.whoami()
-  // `?status=draft` is not refused without write access: it silently answers the published view, which would be mislabeled here.
+  // The API refuses `?status=draft` from such a token with a 403 (spec 1.7.0 on; before it, the published
+  // view came back instead). Checked here, after the one whoami read, so the CLI reads no structure and names its own flag.
   if (status === 'draft' && (token.scope !== 'read_write' || !features.apiTokensWrite)) {
-    throw new HypervalentError({ status: 0, code: 'TOKEN_SCOPE_READ_ONLY', message: '--status draft needs a read_write token on a plan with API writes. Any other token sees published structure only.' })
+    throw new HypervalentError({ status: 0, code: 'TOKEN_SCOPE_READ_ONLY', message: '--status draft needs a read_write token on a plan with API writes. The API refuses any other token with a 403.' })
   }
   const slug = options.project ?? token.projectSlug
   if (!slug) {

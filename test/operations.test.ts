@@ -73,6 +73,10 @@ const CALLS: Record<string, (site: ProjectResources, hv: ReturnType<typeof creat
   'library.list': s => s.library.list(),
   'library.plan': s => s.library.plan(ITEMS),
   'library.insert': s => s.library.insert(ITEMS),
+  'media.list': s => s.media.list(),
+  'media.pages': s => s.media.pages(),
+  'media.iterate': s => s.media.iterate(),
+  'media.get': s => s.media.get('a b'),
   'media.upload': s => s.media.upload(new Blob(['x'])),
   'media.uploadFromUrl': s => s.media.uploadFromUrl('https://example.test/a.png')
 }
@@ -83,7 +87,7 @@ const EMPTY_PAGE = { results: [], count: 0, limit: 50, offset: 0, page: 1 }
 /** Runs a method, draining it if it is a walk, and answers the one request it made. */
 async function requestOf(name: string) {
   const f = vi.fn<typeof fetch>(async () => new Response(
-    JSON.stringify({ ...EMPTY_PAGE, documents: EMPTY_PAGE, terms: EMPTY_PAGE }),
+    JSON.stringify({ ...EMPTY_PAGE, documents: EMPTY_PAGE, terms: EMPTY_PAGE, images: EMPTY_PAGE }),
     { headers: { 'content-type': 'application/json' } }
   ))
   const hv = createClient({ token: 'atk_test', org: 'acme', baseUrl: 'https://api.test', fetch: f })

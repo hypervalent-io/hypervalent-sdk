@@ -238,7 +238,7 @@ export interface paths {
         put?: never;
         /**
          * Edit a document
-         * @description Edit the working document (draft or published; a trashed document is a 404). `content` / `rootAtoms` / `taxonomyTerms` land on the working version FIRST — an editor holding a fresh checkout refuses the whole save with 409 `VERSION_LOCKED` and nothing is written — then `title` / `description` / `slug` land on the row. Editing a published version with versioning on forks a new draft, as the editor would.
+         * @description Edit the working document (draft or published; a trashed document is a 404). `content` / `rootAtoms` / `taxonomyTerms` land on the working version FIRST — an editor holding a fresh checkout refuses the whole save with 409 `VERSION_LOCKED` and nothing is written — then `title` / `description` / `slug` land on the row. Editing a published version with versioning on forks a new draft, as the editor would. **Each of `content`, `rootAtoms` and `taxonomyTerms` that is sent REPLACES the stored value whole; nothing is merged.** A root atom left out of `rootAtoms` is cleared (it reads back with its binding's default), a block left out of `content` is removed, and a term left out of `taxonomyTerms` is untagged. A key the body omits entirely leaves that value as it was, and `title`, `description` and `slug` are each edited on their own. To change some fields and keep the rest, read the working view (`GET …/documents/{slug}?status=draft`), merge your changes into its `rootAtoms` (an array there: send it back as an object keyed by atom `uuid`), `content` or tags, and send the whole set.
          */
         post: operations["updateDocument"];
         delete?: never;
@@ -398,13 +398,37 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List media
+         * @description One page of the project's media library — images, files and videos, newest first (`dateCreated`, then a stable tie-break, so offset paging neither skips nor repeats a row). Trashed items are left out. **Needs a `read_write` token on a plan with API writes**, like `status=draft`: the library holds assets for unpublished work, so a `read` token is refused (403 `TOKEN_SCOPE_READ_ONLY`). A published content read already lists the media it uses in `referencedImages` / `referencedFiles`.
+         */
+        get: operations["listMedia"];
         put?: never;
         /**
          * Upload an image, file or video
          * @description Upload one or more images, files or videos as `multipart/form-data` (`file` / `files` + `title` / `alt`), or one by public URL as JSON `{ url }` fetched server-side. Same ingest pipeline as Studio: content sniffing, a type allow-list (by default JPEG, PNG, WebP, GIF, AVIF and SVG images, PDF, Word, Excel and PowerPoint documents, zip, CSV and plain text, and MP4, WebM and MOV videos), SVG sanitizing, sha256 de-duplication, the plan's storage cap (403 `LIMIT_EXCEEDED`) and async thumbnails for images (files and videos have none, and no `width` / `height`). Per-file size caps, by default 20 MiB for images and files and 30 MiB for videos; a file over its cap is 413 `FILE_TOO_LARGE`. Use the returned `uuid` in an image field (images only), a file field, or a video field (videos only).
          */
         post: operations["uploadMedia"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{org_id}/projects/{projectSlug}/media/{uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a media item
+         * @description One item of the project's media library by `uuid`. A trashed item, another project's and an unknown `uuid` are all 404. **Needs a `read_write` token on a plan with API writes**; a `read` token gets the same 403 `TOKEN_SCOPE_READ_ONLY` whether or not the `uuid` exists.
+         */
+        get: operations["getMedia"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -576,7 +600,7 @@ export interface paths {
         put?: never;
         /**
          * Edit a term
-         * @description Edit the working term: content first (lock check on), then the row — including `parentSlug` (`null` = top level; never itself).
+         * @description Edit the working term: content first (lock check on), then the row — including `parentSlug` (`null` = top level; never itself). **`content` and `rootAtoms`, when sent, each REPLACE the stored value whole; nothing is merged.** A root atom left out of `rootAtoms` is cleared (it reads back with its binding's default) and a block left out of `content` is removed. A key the body omits entirely leaves that value as it was. To change some fields and keep the rest, read the working view (`GET …/terms/{slug}?status=draft`), merge your changes into its `rootAtoms` (an array there: send it back as an object keyed by atom `uuid`) or `content`, and send the whole set.
          */
         post: operations["updateTerm"];
         delete?: never;
@@ -743,7 +767,7 @@ export interface components {
             /** @description The fixed public feature trio — never the organization's whole entitlement map. */
             features: {
                 mcpServer: boolean;
-                /** @description Whether this token may write today (scope `read_write` AND the plan allows API writes). */
+                /** @description Whether this token may write today: `true` only when its scope is `read_write` AND the plan allows API writes, so a `read` token always answers `false`. The other two flags describe the plan. */
                 apiTokensWrite: boolean;
                 removeBranding: boolean;
             };
@@ -778,7 +802,7 @@ export interface components {
             /** @description The fixed public feature trio — never the organization's whole entitlement map. */
             features: {
                 mcpServer: boolean;
-                /** @description Whether this token may write today (scope `read_write` AND the plan allows API writes). */
+                /** @description Whether this token may write today: `true` only when its scope is `read_write` AND the plan allows API writes, so a `read` token always answers `false`. The other two flags describe the plan. */
                 apiTokensWrite: boolean;
                 removeBranding: boolean;
             };
@@ -925,10 +949,24 @@ export interface components {
             applied: boolean;
             /** @description Every row of the closure, atoms first. */
             rows: components["schemas"]["LibraryPlanRow"][];
-            /** @description Counts: `{ atoms, molecules }`, each `{ add, reuse, publish }`. */
-            tables: Record<string, never>;
-            /** @description The slugs involved: `{ atoms, molecules }`, in dependency order. */
-            closure: Record<string, never>;
+            /** @description How many rows of each kind take each action. Every count is present, 0 included. */
+            tables: {
+                atoms: {
+                    add: number;
+                    reuse: number;
+                    publish: number;
+                };
+                molecules: {
+                    add: number;
+                    reuse: number;
+                    publish: number;
+                };
+            };
+            /** @description Every slug involved, the requested items and their dependencies — `resolveClosure` (`library/index.js`). `molecules` is in dependency order (a supported child before its parent); `atoms` in the order they were reached. A kind with none is an empty array. */
+            closure: {
+                atoms: string[];
+                molecules: string[];
+            };
             inserted: components["schemas"]["LibraryPlanRow"][];
             reused: components["schemas"]["LibraryPlanRow"][];
             published: components["schemas"]["LibraryPlanRow"][];
@@ -1591,15 +1629,15 @@ export interface components {
             /** @description Omit on create to derive a unique slug from the title (`-2`, `-3`, … on collision). Supplied, it is used as-is — a collision is a 409 `SLUG_CONFLICT`. */
             slug?: string;
             description?: string;
-            /** @description The content tree — an array of nodes shaped like the document type's preset template. */
+            /** @description The content tree — an array of nodes shaped like the document type's preset template. On an edit it replaces the stored tree whole. */
             content?: {
                 [key: string]: unknown;
             }[];
-            /** @description Root-atom values keyed by ATOM UUID (the `uuid` of each entry in the document type's `atoms`). Unknown keys are refused with 422 naming the allowed list. Image fields take image uuid(s) from `POST …/media`. */
+            /** @description Root-atom values keyed by ATOM UUID (the `uuid` of each entry in the document type's `atoms`). Unknown keys are refused with 422 naming the allowed list. Image fields take image uuid(s) from `POST …/media`. On an edit it replaces the stored set whole: an atom left out is cleared, so send every value to keep. */
             rootAtoms?: {
                 [key: string]: unknown;
             };
-            /** @description Uuids of the terms to tag. */
+            /** @description Uuids of the terms to tag. On an edit it replaces the tags whole. */
             taxonomyTerms?: string[];
         };
         /** @description `shapePublicTaxonomy` (`services/public-taxonomy-service.js`). The preset editor content tree is served in the working view only. */
@@ -1757,10 +1795,11 @@ export interface components {
             description?: string;
             /** @description The slug of a live term in the SAME taxonomy to nest under; `null` makes the term top-level; absent leaves the parent alone. Never the term itself. */
             parentSlug?: string | null;
+            /** @description The content tree. On an edit it replaces the stored tree whole. */
             content?: {
                 [key: string]: unknown;
             }[];
-            /** @description Root-atom values keyed by atom uuid — must be atoms the taxonomy binds (`atoms` on the taxonomy read). */
+            /** @description Root-atom values keyed by atom uuid — must be atoms the taxonomy binds (`atoms` on the taxonomy read). On an edit it replaces the stored set whole: an atom left out is cleared, so send every value to keep. */
             rootAtoms?: {
                 [key: string]: unknown;
             };
@@ -1784,6 +1823,54 @@ export interface components {
             files?: string[];
             title?: string;
             alt?: string;
+        };
+        /** @description One media-library row — `shapePublicMedia` (`services/public-media-service.js`): the `Image` fields except `deduped`, plus `filename`, `description` and `dateModified`. Files and videos have no `width` / `height` and no thumbnails. */
+        MediaItem: {
+            /** Format: uuid */
+            uuid: string;
+            title: string | null;
+            alt: string | null;
+            mime: string;
+            sizeBytes: number;
+            width: number | null;
+            height: number | null;
+            /** Format: uri */
+            cdnUrl: string;
+            /**
+             * Format: uri
+             * @description `null` until the async thumbnail job has run.
+             */
+            thumb256Url: string | null;
+            /** Format: uri */
+            thumb1024Url: string | null;
+            /** Format: date-time */
+            dateCreated: string;
+            /** @description The name the file was uploaded with. */
+            filename: string | null;
+            description: string | null;
+            /** Format: date-time */
+            dateModified: string;
+        };
+        /** @description GET …/media — one page of the project's media library, newest first. */
+        MediaList: {
+            images: {
+                results: components["schemas"]["MediaItem"][];
+                /** @description The TOTAL number of rows, not the page size. */
+                count: number;
+                /** @description The effective page size after clamping to the server maximum (50). */
+                limit: number;
+                offset: number;
+                /** @description 1-based page number. */
+                page: number;
+            };
+            /** @description Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses. */
+            poweredBy?: string;
+        };
+        /** @description GET …/media/{uuid} — one media-library row. */
+        MediaRead: {
+            image: components["schemas"]["MediaItem"];
+            /** @description Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses. */
+            poweredBy?: string;
         };
         /** @description A multipart upload answers `{ images, errors }`; a JSON `{ url }` upload answers `{ image }`. */
         MediaUploadResult: {
@@ -1893,7 +1980,7 @@ export interface operations {
     listAtoms: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -1934,7 +2021,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2089,7 +2176,7 @@ export interface operations {
     getAtom: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -2132,7 +2219,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2566,7 +2653,7 @@ export interface operations {
     listDesignTokens: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
                 /** @description Filter by token type (e.g. `color`). */
                 token_type?: string;
@@ -2611,7 +2698,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2928,7 +3015,7 @@ export interface operations {
     listDocumentTypes: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -2969,7 +3056,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3124,7 +3211,7 @@ export interface operations {
     listDocuments: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
                 /** @description The order of the list; a leading `-` reverses it. Every order breaks ties the same way, so offset paging stays deterministic. A document with no `datePublished` (a never-published draft in the `status=draft` view) sorts as the oldest: first ascending, last descending. */
                 sort?: "title" | "-title" | "datePublished" | "-datePublished" | "dateModified" | "-dateModified";
@@ -3181,7 +3268,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3347,7 +3434,7 @@ export interface operations {
     getDocument: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -3392,7 +3479,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3887,7 +3974,7 @@ export interface operations {
     getDocumentType: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -3930,7 +4017,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4379,6 +4466,107 @@ export interface operations {
             };
         };
     };
+    listMedia: {
+        parameters: {
+            query?: {
+                /** @description Page size, clamped to the server maximum (50). */
+                limit?: number;
+                /** @description 1-based page number. Wins over `offset` when both are given. */
+                page?: number;
+                /** @description Row offset — an alternative to `page`, ignored when a valid `page` is given. */
+                offset?: number;
+                /** @description `image`, `video` or `audio` by type; `document` is PDFs, office documents, zip, CSV and text; `file` is everything that is not an image. Anything else is a 422. */
+                mediaType?: "image" | "video" | "audio" | "document" | "file";
+                /** @description Matches the title or the uploaded filename. */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The organization's public id — shown in Studio → Settings → API tokens and in the MCP server URL. Never the organization's uuid. */
+                org_id: string;
+                /** @description The project slug. Discover it with `GET /orgs/{org_id}/projects`. A project-narrowed token may only name its own project (403 `TOKEN_PROJECT_MISMATCH` otherwise). */
+                projectSlug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaList"];
+                };
+            };
+            /** @description `API_TOKEN_REQUIRED` — no credential; `INVALID_API_TOKEN` — revoked, expired, unknown, or another organization's token (nested `{ error }` envelope from the authenticator). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description `BILLING_TERMINATED` — the organization's subscription was terminated for non-payment. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform Also: `TOKEN_SCOPE_READ_ONLY` — a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — the plan has no API writes (carries `requiredPlan`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description `NOT_FOUND` — unknown org id, project slug, or resource. Never distinguishes "does not exist" from "not published". */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` — an unknown `mediaType`, or a repeated `search`; `fields` names it */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `RATE_LIMITED` — the per-credential limit was hit. `Retry-After` says how long to wait; draft-8 `RateLimit` headers name the policy. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `QUERY_FAILED` — the read or write could not complete. Never an empty 200. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     uploadMedia: {
         parameters: {
             query?: never;
@@ -4510,10 +4698,93 @@ export interface operations {
             };
         };
     };
+    getMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The organization's public id — shown in Studio → Settings → API tokens and in the MCP server URL. Never the organization's uuid. */
+                org_id: string;
+                /** @description The project slug. Discover it with `GET /orgs/{org_id}/projects`. A project-narrowed token may only name its own project (403 `TOKEN_PROJECT_MISMATCH` otherwise). */
+                projectSlug: string;
+                /** @description The media item's `uuid`, as an upload, a list page or a content read's `referencedImages` / `referencedFiles` returns it. */
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaRead"];
+                };
+            };
+            /** @description `API_TOKEN_REQUIRED` — no credential; `INVALID_API_TOKEN` — revoked, expired, unknown, or another organization's token (nested `{ error }` envelope from the authenticator). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description `BILLING_TERMINATED` — the organization's subscription was terminated for non-payment. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform Also: `TOKEN_SCOPE_READ_ONLY` — a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — the plan has no API writes (carries `requiredPlan`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description `NOT_FOUND` — unknown org id, project slug, or resource. Never distinguishes "does not exist" from "not published". */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `RATE_LIMITED` — the per-credential limit was hit. `Retry-After` says how long to wait; draft-8 `RateLimit` headers name the policy. */
+            429: {
+                headers: {
+                    /** @description Seconds to wait. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `QUERY_FAILED` — the read or write could not complete. Never an empty 200. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listMolecules: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -4554,7 +4825,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4709,7 +4980,7 @@ export interface operations {
     getMolecule: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -4752,7 +5023,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5073,7 +5344,7 @@ export interface operations {
     listTaxonomies: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -5114,7 +5385,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5269,7 +5540,7 @@ export interface operations {
     getTaxonomy: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
                 /** @description Lists only the rows with a `dateModified` at or after this instant, and `count` counts only those. An ISO 8601 date-time with a zone, like `2026-01-31T09:30:00Z`; anything else is a 422, and a `+` offset must be percent-encoded. Inclusive to the second, so a row can come back twice across builds but is not missed. It **cannot report removals**: a row that leaves the view, trashed or (in the published view) unpublished, just stops appearing, so pair it with a periodic full walk or with webhooks. An edit to a term or image a row references does not move the row's `dateModified`. Saving a draft of a published row moves it too, so a published read can return it with its content unchanged. */
                 modifiedSince?: string;
@@ -5320,7 +5591,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5600,7 +5871,7 @@ export interface operations {
     getTerm: {
         parameters: {
             query?: {
-                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists. */
+                /** @description `published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published. */
                 status?: "published" | "draft";
             };
             header?: never;
@@ -5645,7 +5916,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform */
+            /** @description `TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`) */
             403: {
                 headers: {
                     [name: string]: unknown;

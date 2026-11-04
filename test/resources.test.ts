@@ -387,6 +387,61 @@ describe('media', () => {
     spy.mockRestore()
   })
 
+  /** A media list answer. `offset` follows the page, as the API's does. */
+  const mediaPage = (rows: unknown[], page: number, count: number, limit = 2) => ({
+    images: { results: rows, count, limit, offset: (page - 1) * limit, page }
+  })
+
+  it('list() makes one GET with the filters the spec names, and answers the envelope', async () => {
+    const answer = mediaPage([row('a')], 1, 9)
+    const f = fakeFetch(answer)
+    expect(await client(f).project('p').media.list({ mediaType: 'image', search: 'hero', page: 2 })).toEqual(answer)
+    expect(f).toHaveBeenCalledOnce()
+    expect(initOf(f).method).toBe('GET')
+    expect(urlOf(f).pathname).toBe('/v1/orgs/acme/projects/p/media')
+    expect(urlOf(f).search).toBe('?mediaType=image&search=hero&page=2')
+  })
+
+  it('iterate() walks every page of .images, keeping the filters', async () => {
+    const f = fakeFetch(mediaPage([row('a'), row('b')], 1, 3), mediaPage([row('c')], 2, 3))
+    const rows = await collect(client(f).project('p').media.iterate({ limit: 2, mediaType: 'document' }))
+    expect(rows.map(r => r.uuid)).toEqual(['a', 'b', 'c'])
+    expect(f).toHaveBeenCalledTimes(2)
+    for (const call of [0, 1]) {
+      expect(urlOf(f, call).searchParams.get('mediaType')).toBe('document')
+      expect(urlOf(f, call).searchParams.get('page')).toBe(String(call + 1))
+    }
+  })
+
+  it('get() reads one item by its encoded uuid, and refuses an empty one before any request', async () => {
+    const f = fakeFetch({ image: row('i') })
+    const { media } = client(f).project('p')
+    expect(await media.get('i/x')).toEqual({ image: row('i') })
+    expect(urlOf(f).pathname).toBe('/v1/orgs/acme/projects/p/media/i%2Fx')
+    await expect(media.get('')).rejects.toThrow(new TypeError('uuid must be a slug'))
+    expect(f).toHaveBeenCalledOnce()
+  })
+
+  it('surfaces a read token\'s 403 TOKEN_SCOPE_READ_ONLY as a HypervalentError', async () => {
+    const f = vi.fn<typeof fetch>(async () => json({ status: 403, code: 'TOKEN_SCOPE_READ_ONLY', message: 'No', requiredPlan: 'team' }, 403))
+    const error = await client(f).project('p').media.get('i').catch((err: unknown) => err)
+    expect(isHypervalentError(error) && [error.status, error.code]).toEqual([403, 'TOKEN_SCOPE_READ_ONLY'])
+    expect(f).toHaveBeenCalledOnce()
+  })
+
+  it('types the media filters, and refuses the rest', () => {
+    // Compile-time only (`npm run typecheck`): never called.
+    const typed = (hv: ReturnType<typeof client>) => {
+      const { media } = hv.project('p')
+      void media.pages({ mediaType: 'video', search: 'x' })
+      // @ts-expect-error not one of the media types
+      void media.list({ mediaType: 'pdf' })
+      // @ts-expect-error the media list has no sort
+      void media.list({ sort: 'title' })
+    }
+    expect(typed).toBeTypeOf('function')
+  })
+
   it('other calls keep the client timeout', async () => {
     const spy = timeouts()
     await client(fakeFetch({})).project('p').settings.list()
