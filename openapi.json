@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Hypervalent Public API",
-    "version": "1.5.0",
+    "version": "1.8.0",
     "summary": "The token-authenticated content delivery and authoring API behind Hypervalent Studio.",
     "description": "Every route lives under `/orgs/{org_id}/projects/{projectSlug}/…` — the project is a **required path segment**, never a query\nparameter — except the two org-level discovery reads (`/token`, `/projects`). Authenticate with an organization API token\n(`atk_…`) in `Authorization: Bearer` or `X-API-Key`. Bodies are JSON with camelCase keys. Read responses for organizations\nwithout the `removeBranding` entitlement carry a `poweredBy` string.\n\nThis document is generated from the server's route table and token allow-list; the schemas are hand-authored beside\nthe shapers they describe. See https://docs.hypervalent.io/api/ for the guide.",
     "contact": {
@@ -55,7 +55,7 @@
     },
     {
       "name": "Media",
-      "description": "Image, file and video upload."
+      "description": "The media library — images, files and videos: upload, and (with a `read_write` token) list and look up."
     }
   ],
   "paths": {
@@ -244,7 +244,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -286,7 +286,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -555,7 +555,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -597,7 +597,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1291,7 +1291,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           },
           {
             "name": "token_type",
@@ -1349,7 +1349,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1876,7 +1876,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -1918,7 +1918,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2188,7 +2188,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           },
           {
             "name": "sort",
@@ -2302,7 +2302,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2600,7 +2600,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -2642,7 +2642,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2706,7 +2706,7 @@
         ],
         "operationId": "updateDocument",
         "summary": "Edit a document",
-        "description": "Edit the working document (draft or published; a trashed document is a 404). `content` / `rootAtoms` / `taxonomyTerms` land on the working version FIRST — an editor holding a fresh checkout refuses the whole save with 409 `VERSION_LOCKED` and nothing is written — then `title` / `description` / `slug` land on the row. Editing a published version with versioning on forks a new draft, as the editor would.",
+        "description": "Edit the working document (draft or published; a trashed document is a 404). `content` / `rootAtoms` / `taxonomyTerms` land on the working version FIRST — an editor holding a fresh checkout refuses the whole save with 409 `VERSION_LOCKED` and nothing is written — then `title` / `description` / `slug` land on the row. Editing a published version with versioning on forks a new draft, as the editor would. **Each of `content`, `rootAtoms` and `taxonomyTerms` that is sent REPLACES the stored value whole; nothing is merged.** A root atom left out of `rootAtoms` is cleared (it reads back with its binding's default), a block left out of `content` is removed, and a term left out of `taxonomyTerms` is untagged. A key the body omits entirely leaves that value as it was, and `title`, `description` and `slug` are each edited on their own. To change some fields and keep the rest, read the working view (`GET …/documents/{slug}?status=draft`), merge your changes into its `rootAtoms` (an array there: send it back as an object keyed by atom `uuid`), `content` or tags, and send the whole set.",
         "parameters": [
           {
             "name": "org_id",
@@ -3452,7 +3452,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -3494,7 +3494,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4174,6 +4174,193 @@
       }
     },
     "/orgs/{org_id}/projects/{projectSlug}/media": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "operationId": "listMedia",
+        "summary": "List media",
+        "description": "One page of the project's media library — images, files and videos, newest first (`dateCreated`, then a stable tie-break, so offset paging neither skips nor repeats a row). Trashed items are left out. **Needs a `read_write` token on a plan with API writes**, like `status=draft`: the library holds assets for unpublished work, so a `read` token is refused (403 `TOKEN_SCOPE_READ_ONLY`). A published content read already lists the media it uses in `referencedImages` / `referencedFiles`.",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The organization's public id — shown in Studio → Settings → API tokens and in the MCP server URL. Never the organization's uuid."
+          },
+          {
+            "name": "projectSlug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The project slug. Discover it with `GET /orgs/{org_id}/projects`. A project-narrowed token may only name its own project (403 `TOKEN_PROJECT_MISMATCH` otherwise)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            },
+            "description": "Page size, clamped to the server maximum (50)."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "1-based page number. Wins over `offset` when both are given."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Row offset — an alternative to `page`, ignored when a valid `page` is given."
+          },
+          {
+            "name": "mediaType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "image",
+                "video",
+                "audio",
+                "document",
+                "file"
+              ]
+            },
+            "description": "`image`, `video` or `audio` by type; `document` is PDFs, office documents, zip, CSV and text; `file` is everything that is not an image. Anything else is a 422."
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Matches the title or the uploaded filename."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`API_TOKEN_REQUIRED` — no credential; `INVALID_API_TOKEN` — revoked, expired, unknown, or another organization's token (nested `{ error }` envelope from the authenticator).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "`BILLING_TERMINATED` — the organization's subscription was terminated for non-payment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform Also: `TOKEN_SCOPE_READ_ONLY` — a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — the plan has no API writes (carries `requiredPlan`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`NOT_FOUND` — unknown org id, project slug, or resource. Never distinguishes \"does not exist\" from \"not published\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`VALIDATION_ERROR` — an unknown `mediaType`, or a repeated `search`; `fields` names it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`RATE_LIMITED` — the per-credential limit was hit. `Retry-After` says how long to wait; draft-8 `RateLimit` headers name the policy.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds to wait."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`QUERY_FAILED` — the read or write could not complete. Never an empty 200.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "read_write",
+        "x-rate-limit": "publicApi (120/min per credential)"
+      },
       "post": {
         "tags": [
           "Media"
@@ -4371,6 +4558,141 @@
         "x-rate-limit": "publicApiWrite (60/min + 2,000/day per credential)"
       }
     },
+    "/orgs/{org_id}/projects/{projectSlug}/media/{uuid}": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "operationId": "getMedia",
+        "summary": "Get a media item",
+        "description": "One item of the project's media library by `uuid`. A trashed item, another project's and an unknown `uuid` are all 404. **Needs a `read_write` token on a plan with API writes**; a `read` token gets the same 403 `TOKEN_SCOPE_READ_ONLY` whether or not the `uuid` exists.",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The organization's public id — shown in Studio → Settings → API tokens and in the MCP server URL. Never the organization's uuid."
+          },
+          {
+            "name": "projectSlug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The project slug. Discover it with `GET /orgs/{org_id}/projects`. A project-narrowed token may only name its own project (403 `TOKEN_PROJECT_MISMATCH` otherwise)."
+          },
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The media item's `uuid`, as an upload, a list page or a content read's `referencedImages` / `referencedFiles` returns it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`API_TOKEN_REQUIRED` — no credential; `INVALID_API_TOKEN` — revoked, expired, unknown, or another organization's token (nested `{ error }` envelope from the authenticator).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "`BILLING_TERMINATED` — the organization's subscription was terminated for non-payment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform Also: `TOKEN_SCOPE_READ_ONLY` — a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — the plan has no API writes (carries `requiredPlan`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`NOT_FOUND` — unknown org id, project slug, or resource. Never distinguishes \"does not exist\" from \"not published\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`RATE_LIMITED` — the per-credential limit was hit. `Retry-After` says how long to wait; draft-8 `RateLimit` headers name the policy.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds to wait."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`QUERY_FAILED` — the read or write could not complete. Never an empty 200.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "read_write",
+        "x-rate-limit": "publicApi (120/min per credential)"
+      }
+    },
     "/orgs/{org_id}/projects/{projectSlug}/molecules": {
       "get": {
         "tags": [
@@ -4408,7 +4730,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -4450,7 +4772,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4719,7 +5041,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -4761,7 +5083,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -5292,7 +5614,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -5334,7 +5656,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -5604,7 +5926,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           },
           {
             "name": "modifiedSince",
@@ -5685,7 +6007,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6158,7 +6480,7 @@
               ],
               "default": "published"
             },
-            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller reads published, so a read token never learns what draft work exists."
+            "description": "`published` (default) reads live content. `draft` reads the **working view** — every non-trashed row, draft or published, with its latest working version — and needs a `read_write` token on a plan with API writes. Any other caller asking for `draft` is refused with 403 (`TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` when the plan has no API writes) before the resource is looked up, so the answer is the same for every slug and a read token never learns what draft work exists. Any other value reads published."
           }
         ],
         "responses": {
@@ -6200,7 +6522,7 @@
             }
           },
           "403": {
-            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform",
+            "description": "`TOKEN_ORG_MISMATCH` / `TOKEN_PROJECT_MISMATCH` — the credential does not cover the URL's org or project; `ACCOUNT_CLOSED`; `DELIVERY_BLOCKED` — content delivery for the organization is blocked by the platform; `TOKEN_SCOPE_READ_ONLY` — `status=draft` from a `read` token (carries `requiredPlan`); `FEATURE_DISABLED` — `status=draft` on a plan with no API writes (carries `requiredPlan`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6264,7 +6586,7 @@
         ],
         "operationId": "updateTerm",
         "summary": "Edit a term",
-        "description": "Edit the working term: content first (lock check on), then the row — including `parentSlug` (`null` = top level; never itself).",
+        "description": "Edit the working term: content first (lock check on), then the row — including `parentSlug` (`null` = top level; never itself). **`content` and `rootAtoms`, when sent, each REPLACE the stored value whole; nothing is merged.** A root atom left out of `rootAtoms` is cleared (it reads back with its binding's default) and a block left out of `content` is removed. A key the body omits entirely leaves that value as it was. To change some fields and keep the rest, read the working view (`GET …/terms/{slug}?status=draft`), merge your changes into its `rootAtoms` (an array there: send it back as an object keyed by atom `uuid`) or `content`, and send the whole set.",
         "parameters": [
           {
             "name": "org_id",
@@ -7358,7 +7680,7 @@
               },
               "apiTokensWrite": {
                 "type": "boolean",
-                "description": "Whether this token may write today (scope `read_write` AND the plan allows API writes)."
+                "description": "Whether this token may write today: `true` only when its scope is `read_write` AND the plan allows API writes, so a `read` token always answers `false`. The other two flags describe the plan."
               },
               "removeBranding": {
                 "type": "boolean"
@@ -7470,7 +7792,7 @@
               },
               "apiTokensWrite": {
                 "type": "boolean",
-                "description": "Whether this token may write today (scope `read_write` AND the plan allows API writes)."
+                "description": "Whether this token may write today: `true` only when its scope is `read_write` AND the plan allows API writes, so a `read` token always answers `false`. The other two flags describe the plan."
               },
               "removeBranding": {
                 "type": "boolean"
@@ -7980,11 +8302,73 @@
           },
           "tables": {
             "type": "object",
-            "description": "Counts: `{ atoms, molecules }`, each `{ add, reuse, publish }`."
+            "description": "How many rows of each kind take each action. Every count is present, 0 included.",
+            "required": [
+              "atoms",
+              "molecules"
+            ],
+            "properties": {
+              "atoms": {
+                "type": "object",
+                "required": [
+                  "add",
+                  "reuse",
+                  "publish"
+                ],
+                "properties": {
+                  "add": {
+                    "type": "integer"
+                  },
+                  "reuse": {
+                    "type": "integer"
+                  },
+                  "publish": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "molecules": {
+                "type": "object",
+                "required": [
+                  "add",
+                  "reuse",
+                  "publish"
+                ],
+                "properties": {
+                  "add": {
+                    "type": "integer"
+                  },
+                  "reuse": {
+                    "type": "integer"
+                  },
+                  "publish": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
           },
           "closure": {
             "type": "object",
-            "description": "The slugs involved: `{ atoms, molecules }`, in dependency order."
+            "description": "Every slug involved, the requested items and their dependencies — `resolveClosure` (`library/index.js`). `molecules` is in dependency order (a supported child before its parent); `atoms` in the order they were reached. A kind with none is an empty array.",
+            "required": [
+              "atoms",
+              "molecules"
+            ],
+            "properties": {
+              "atoms": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "molecules": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "inserted": {
             "type": "array",
@@ -10113,12 +10497,12 @@
               "type": "object",
               "additionalProperties": true
             },
-            "description": "The content tree — an array of nodes shaped like the document type's preset template."
+            "description": "The content tree — an array of nodes shaped like the document type's preset template. On an edit it replaces the stored tree whole."
           },
           "rootAtoms": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Root-atom values keyed by ATOM UUID (the `uuid` of each entry in the document type's `atoms`). Unknown keys are refused with 422 naming the allowed list. Image fields take image uuid(s) from `POST …/media`."
+            "description": "Root-atom values keyed by ATOM UUID (the `uuid` of each entry in the document type's `atoms`). Unknown keys are refused with 422 naming the allowed list. Image fields take image uuid(s) from `POST …/media`. On an edit it replaces the stored set whole: an atom left out is cleared, so send every value to keep."
           },
           "taxonomyTerms": {
             "type": "array",
@@ -10126,7 +10510,7 @@
               "type": "string",
               "format": "uuid"
             },
-            "description": "Uuids of the terms to tag."
+            "description": "Uuids of the terms to tag. On an edit it replaces the tags whole."
           }
         }
       },
@@ -10644,12 +11028,13 @@
             "items": {
               "type": "object",
               "additionalProperties": true
-            }
+            },
+            "description": "The content tree. On an edit it replaces the stored tree whole."
           },
           "rootAtoms": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Root-atom values keyed by atom uuid — must be atoms the taxonomy binds (`atoms` on the taxonomy read)."
+            "description": "Root-atom values keyed by atom uuid — must be atoms the taxonomy binds (`atoms` on the taxonomy read). On an edit it replaces the stored set whole: an atom left out is cleared, so send every value to keep."
           }
         }
       },
@@ -10693,6 +11078,165 @@
           },
           "alt": {
             "type": "string"
+          }
+        }
+      },
+      "MediaItem": {
+        "type": "object",
+        "description": "One media-library row — `shapePublicMedia` (`services/public-media-service.js`): the `Image` fields except `deduped`, plus `filename`, `description` and `dateModified`. Files and videos have no `width` / `height` and no thumbnails.",
+        "required": [
+          "uuid",
+          "title",
+          "alt",
+          "mime",
+          "sizeBytes",
+          "width",
+          "height",
+          "cdnUrl",
+          "thumb256Url",
+          "thumb1024Url",
+          "dateCreated",
+          "filename",
+          "description",
+          "dateModified"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "alt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mime": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "cdnUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "thumb256Url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "`null` until the async thumbnail job has run."
+          },
+          "thumb1024Url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "dateCreated": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "filename": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name the file was uploaded with."
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dateModified": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MediaList": {
+        "type": "object",
+        "description": "GET …/media — one page of the project's media library, newest first.",
+        "required": [
+          "images"
+        ],
+        "properties": {
+          "images": {
+            "type": "object",
+            "required": [
+              "results",
+              "count",
+              "limit",
+              "offset",
+              "page"
+            ],
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/MediaItem"
+                }
+              },
+              "count": {
+                "type": "integer",
+                "description": "The TOTAL number of rows, not the page size."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The effective page size after clamping to the server maximum (50)."
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "page": {
+                "type": "integer",
+                "description": "1-based page number."
+              }
+            }
+          },
+          "poweredBy": {
+            "type": "string",
+            "description": "Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses."
+          }
+        }
+      },
+      "MediaRead": {
+        "type": "object",
+        "description": "GET …/media/{uuid} — one media-library row.",
+        "required": [
+          "image"
+        ],
+        "properties": {
+          "image": {
+            "$ref": "#/components/schemas/MediaItem"
+          },
+          "poweredBy": {
+            "type": "string",
+            "description": "Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses."
           }
         }
       },

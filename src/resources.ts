@@ -129,7 +129,14 @@ export interface ProjectResources {
     plan(items: readonly Schemas['LibraryItemRef'][], options?: CallOptions): Promise<Answer<'planLibraryInsert'>>
     insert(items: readonly Schemas['LibraryItemRef'][], options?: CallOptions): Promise<Answer<'insertLibraryItems'>>
   }
-  media: {
+  /**
+   * `list()`, `pages()`, `iterate()` and `get()` read the media library, newest first, and need a
+   * `read_write` token on a plan with API writes: a `read` token gets 403 `TOKEN_SCOPE_READ_ONLY`, and a plan without API writes `FEATURE_DISABLED`.
+   * A content read already carries the media it uses in `referencedImages` and `referencedFiles`.
+   */
+  media: Paged<'listMedia', Schemas['MediaItem']> & {
+    /** One item by uuid. Trashed, another project's and unknown uuids are all 404. */
+    get(uuid: string, options?: CallOptions): Promise<Answer<'getMedia'>>
     /** Multipart. `timeoutMs` defaults to 60000. A plain Blob has no file name, so pass a File to keep one. */
     upload(files: Blob | readonly Blob[], options?: UploadOptions): Promise<MediaUploaded>
     /** The server fetches `url`. `timeoutMs` defaults to 60000. */
@@ -288,6 +295,8 @@ function projectResources(request: RequestFn, projectSlug: ProjectSlugFn): Proje
       insert: (items, options) => post(() => '/library/insert', { items }, options)
     },
     media: {
+      ...paged<'listMedia', Schemas['MediaItem']>(options => get(() => '/media', options), page => page.images),
+      get: (uuid, options) => get(() => `/media/${segment('uuid', uuid)}`, options),
       upload(files, { title, alt, ...options } = {}) {
         const form = new FormData()
         const list: readonly Blob[] = Array.isArray(files) ? files : [files as Blob]

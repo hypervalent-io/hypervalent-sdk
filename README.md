@@ -48,15 +48,17 @@ catch (err) {
 | `site.settings` | `list()`, `get()` |
 | `site.designTokens` | `list()`, `update()`, `schemes()`, `theme()`, `updateTheme()`, `css()`, `w3c()` |
 | `site.library` | `list()`, `plan(items)`, `insert(items)` |
-| `site.media` | `upload(files)`, `uploadFromUrl(url)` |
+| `site.media` | `list()`, `pages()`, `iterate()`, `get(uuid)`, `upload(files)`, `uploadFromUrl(url)` |
 
 Each method answers the API's response body as is, and takes the route's query parameters as the API spells them (`status`, `token_type`) plus `signal` and `timeoutMs`. Slugs are URL-encoded for you. A slug that is empty, `.` or `..` is a `TypeError`, because a URL parser would turn it into another route.
+
+**`status: 'draft'` reads the working view and needs a `read_write` token on a plan with API writes.** Any other token gets 403: `TOKEN_SCOPE_READ_ONLY` for a `read` token, `FEATURE_DISABLED` on a plan without API writes. Before API spec 1.7.0 it silently answered the published view. `whoami().features.apiTokensWrite` tells you in advance: since spec 1.8.0 it is this token's answer, `true` only for a `read_write` token on such a plan.
 
 **Without a slug, `hv.project()` reads the token's project** from `GET /v1/token`, once. On an org-wide token, the first call throws `PROJECT_REQUIRED`.
 
 ### Lists
 
-`documents`, `terms` and `projects` are paged, and the rest answer their full set from `list()`.
+`documents`, `terms`, `media` and `projects` are paged, and the rest answer their full set from `list()`.
 
 ```ts
 const posts = site.documents('post')
@@ -114,7 +116,7 @@ version?.blocks                 // the content tree, with molecule slugs
 
 - A write that does not fit is refused before any request with `SCHEMA_VALIDATION`, whose `fields` names every problem.
 - The schema belongs to one project. Used with any other, `documents()` and `terms()` throw `SCHEMA_PROJECT_MISMATCH` rather than send its uuids. That check costs one read of the project list per client.
-- `--status draft` generates from the working structure and needs a `read_write` token on a plan with API writes. Any other token sees published structure only.
+- `--status draft` generates from the working structure and needs a `read_write` token on a plan with API writes. The CLI refuses any other token after its `GET /v1/token` read, before reading any structure; the API would refuse it with a 403.
 - `taxonomyTerms` still takes term uuids.
 
 ### Media
@@ -130,6 +132,18 @@ const assets = resolveFieldMedia(read, 'video', atom.value)
 ```
 
 `upload()` takes a `Blob` or `File`, or an array of them. `errors` lists the files that failed when at least one was stored.
+
+> `media.list()`, `pages()`, `iterate()` and `get()` are new in 0.3.0.
+
+```ts
+const page = await site.media.list({ mediaType: 'image', search: 'hero' })   // page.images.results
+for await (const item of site.media.iterate({ mediaType: 'document' })) {}
+const { image } = await site.media.get(uuid)
+```
+
+The library reads list the project's images, files and videos, newest first, without trashed items. `mediaType` is `image`, `video`, `audio`, `document` (PDFs, office documents, zip, CSV and text) or `file` (everything that is not an image), and `search` matches the title or the uploaded filename. `get(uuid)` answers 404 for a trashed item, another project's or an unknown uuid.
+
+**They need a `read_write` token on a plan with API writes.** The library holds assets for unpublished work, so a `read` token gets 403 `TOKEN_SCOPE_READ_ONLY`, for every uuid alike, and a plan without API writes `FEATURE_DISABLED`. A site build on a `read` token resolves media from the content reads instead, which list what they use in `referencedImages` and `referencedFiles`.
 
 `resolveFieldMedia(read, fieldType, value)` looks a field's value up in the read that carried it. It goes by the field's type: `image` reads `referencedImages`, and `file` and `video` read `referencedFiles`. It answers an array in the value's order. A non-uuid string in a file or video field is an external URL and comes back as given, and a uuid the read does not list is left out.
 

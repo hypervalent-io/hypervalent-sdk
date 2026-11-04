@@ -64,5 +64,7 @@ export const OPERATION_METHODS = {
   planLibraryInsert: ['library.plan'],
   insertLibraryItems: ['library.insert'],
 
+  listMedia: ['media.list', 'media.pages', 'media.iterate'],
+  getMedia: ['media.get'],
   uploadMedia: ['media.upload', 'media.uploadFromUrl']
 } as const satisfies Record<OperationId, readonly string[]>
