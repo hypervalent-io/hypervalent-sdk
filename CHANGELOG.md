@@ -4,13 +4,14 @@ Each release of `@hypervalent-io/sdk` has a section here, and a `vX.Y.Z` tag can
 
 ## 0.4.0
 
-The `json` field type, colour token references, and wire types synced to API spec 1.12.0.
+The `json` and `token` field types, colour token references, and wire types synced to API spec 1.13.0.
 
 - Typegen maps a `json` field to `string`: the value is the JSON text exactly as the author wrote it, and your code runs `JSON.parse` on it. The API refuses a write whose JSON does not parse with 422 `VALIDATION_ERROR`
 - `AtomWrite.fieldType` and the other field-type unions include `json` (spec 1.10.0; 1.9.0 changed a description only)
 - Typegen maps a `color` field to `string | ColorTokenRef`, where `ColorTokenRef` (exported) is `{ token: string }`: a colour picked from the project's design tokens in Studio's Token tab. Code that treated a colour as a string must handle the object. A typed read gives `null` for `{ token: "" }`, the Token tab before a colour is picked
 - The W3C design-tokens read takes a `scheme` query (spec 1.11.0): each colour role's `$value` becomes that scheme's, and an unknown scheme is a 400 `VALIDATION_ERROR`
 - Document, document list, taxonomy and term reads carry `referencedTokens` (spec 1.12.0): each colour role a `{ token }` value names, once, as `{ slug, type, cssVar, value }` — `cssVar` is the variable the public stylesheet sets (it follows the active scheme), `value` the default scheme's colour. A reference to a missing or unpublished token is left out
+- Typegen maps a `token` field to `TokenRef` (exported), `{ token: string }`: the slug of a design token of the type the field's `fieldConfig.tokenType` names — `radius`, `elevation` or `typography` (spec 1.13.0). `{ token: "" }` reads as `null`. `AtomWrite.fieldType` includes `token`, and `referencedTokens` entries can now be `type: 'radius' | 'elevation' | 'typography'` too: `cssVar` is `--md-sys-shape-<slug>`, `--md-sys-elevation-<slug>`, or for typography the `--md-sys-typescale-<slug>` prefix its five properties share, and a typography `value` is an object `{ fontFamily, fontSize, lineHeight, fontWeight, letterSpacing }`
 
 ## 0.3.0
 

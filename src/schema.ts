@@ -23,6 +23,15 @@ export interface ColorTokenRef {
   token: string
 }
 
+/**
+ * A token field's value (API spec 1.13.0): `token` is the slug of a design token of the type the
+ * field's `fieldConfig.tokenType` names (`radius`, `elevation` or `typography`). A content read
+ * lists each referenced token once in `referencedTokens`, with its CSS variable and value.
+ */
+export interface TokenRef {
+  token: string
+}
+
 export interface AtomSchema {
   uuid: string
   fieldType: string
@@ -237,13 +246,13 @@ export function mapWriteBody(schema: ProjectSchema, container: ContainerSchema, 
 
 /**
  * `{}` is the API's stored "no default" on every field but spacing. A media field
- * is always an array here, though older values can be one string. A color field's
- * `{ token: "" }` (Studio's Token tab before a role is picked) is no value too.
+ * is always an array here, though older values can be one string. A color or token
+ * field's `{ token: "" }` (nothing picked yet in Studio) is no value too.
  */
 function readValue(atom: AtomSchema, value: unknown) {
   if (value === undefined || value === null) return null
   if (atom.fieldType !== 'spacing' && isPlainObject(value) && Object.keys(value).length === 0) return null
-  if (atom.fieldType === 'color' && isPlainObject(value) && value.token === '') return null
+  if ((atom.fieldType === 'color' || atom.fieldType === 'token') && isPlainObject(value) && value.token === '') return null
   if (MEDIA_TYPES.has(atom.fieldType) && typeof value === 'string') return [value]
   return value
 }

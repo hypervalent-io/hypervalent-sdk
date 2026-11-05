@@ -1113,7 +1113,7 @@ export interface components {
              */
             status?: "draft" | "published";
             /** @enum {string} */
-            fieldType: "text" | "textarea" | "html" | "markdown" | "json" | "number" | "color" | "image" | "select" | "range" | "spacing" | "date" | "boolean" | "icon" | "link" | "video" | "file" | "email" | "tel" | "slug";
+            fieldType: "text" | "textarea" | "html" | "markdown" | "json" | "number" | "color" | "token" | "image" | "select" | "range" | "spacing" | "date" | "boolean" | "icon" | "link" | "video" | "file" | "email" | "tel" | "slug";
             /**
              * @description Editor layout: `style` atoms edit in the right rail, `content` / `media` in the canvas.
              * @default content
@@ -1121,16 +1121,16 @@ export interface components {
              */
             category?: "style" | "content" | "media";
             /**
-             * @description An array of values instead of one.
+             * @description An array of values instead of one. Not supported by `token`.
              * @default false
              * @enum {boolean|integer}
              */
             multiple?: true | false | 0 | 1;
-            /** @description Only the keys the field type reads: select `options` (required — `[{ value, text?, selected? }]` or strings); number / range `min`, `max`, `step`; html `toolbar` (the toolbar switches, `headings: [1–6]`); image `dragDropEnabled`; image / file / video `maxFileSizeBytes`. Any other key is refused. */
+            /** @description Only the keys the field type reads: select `options` (required — `[{ value, text?, selected? }]` or strings); number / range `min`, `max`, `step`; html `toolbar` (the toolbar switches, `headings: [1–6]`); image `dragDropEnabled`; image / file / video `maxFileSizeBytes`; token `tokenType` (required — `radius`, `elevation` or `typography`: the design-token type the field picks from). Any other key is refused. */
             fieldConfig?: {
                 [key: string]: unknown;
             };
-            /** @description A value of the field's shape: a string for text-like types (a safe link for `link`); for color, a CSS colour string or `{ "token": "<slug>" }` naming one of the project's published colour roles; a number for number / range, within `min` / `max`; a boolean; one of the option values for select; `{ top?, right?, bottom?, left? }` numbers for spacing; an array of media uuids (or video URLs) for image / file / video. An array of those when `multiple`. */
+            /** @description A value of the field's shape: a string for text-like types (a safe link for `link`); for color, a CSS colour string or `{ "token": "<slug>" }` naming one of the project's published colour roles; for token, `{ "token": "<slug>" }` naming one of the project's published tokens of the field's `tokenType`; a number for number / range, within `min` / `max`; a boolean; one of the option values for select; `{ top?, right?, bottom?, left? }` numbers for spacing; an array of media uuids (or video URLs) for image / file / video. An array of those when `multiple`. */
             defaultValue?: unknown;
         };
         MoleculeWrite: {
@@ -1434,7 +1434,7 @@ export interface components {
         ProjectedRootAtom: {
             /** Format: uuid */
             uuid: string;
-            /** @description Any JSON value. An image field holds image uuid(s) — look them up in `referencedImages`. A file field holds media uuid(s) — look them up in `referencedFiles`; a non-uuid string there is an external URL written before file fields picked from the media library. A video field holds video uuid(s) — also in `referencedFiles` — and/or external video URLs (YouTube, Vimeo, …) as non-uuid strings. A color field holds a CSS colour string or `{ "token": "<slug>" }` — look the slug up in `referencedTokens`. */
+            /** @description Any JSON value. An image field holds image uuid(s) — look them up in `referencedImages`. A file field holds media uuid(s) — look them up in `referencedFiles`; a non-uuid string there is an external URL written before file fields picked from the media library. A video field holds video uuid(s) — also in `referencedFiles` — and/or external video URLs (YouTube, Vimeo, …) as non-uuid strings. A color field holds a CSS colour string or `{ "token": "<slug>" }`, and a token field `{ "token": "<slug>" }` — look the slug up in `referencedTokens`. */
             value: unknown;
             /** @enum {integer} */
             locked: 0 | 1;
@@ -1503,19 +1503,21 @@ export interface components {
             /** @description Bytes. */
             size: number;
         };
-        /** @description A published design token referenced by a version's color fields as `{ "token": "<slug>" }` (content or root atoms) — `shapeReferencedColorToken` (`services/referenced-tokens.js`). A reference to a token that is missing, unpublished or a palette tone is left out; fall back to the field's default. */
+        /** @description A published design token referenced by a version's color or token fields as `{ "token": "<slug>" }` (content or root atoms) — `shapeReferencedColorToken` / `shapeReferencedDesignToken` (`services/referenced-tokens.js`). A reference to a token that is missing, unpublished or a palette tone — or, from a token field, a token of another type than its `tokenType` — is left out; fall back to the field's default. */
         ReferencedToken: {
             /** @description The token slug the value names. */
             slug: string;
             /**
-             * @description The token type. Only colour roles are referenced today.
+             * @description The token type: `color` from a color field, the field's `tokenType` from a token field.
              * @enum {string}
              */
-            type: "color";
-            /** @description The custom property the public CSS export (`…/design-tokens.css`) sets for this token, e.g. `--md-sys-color-primary`. It follows the active colour scheme. */
+            type: "color" | "radius" | "elevation" | "typography";
+            /** @description The custom property the public CSS export (`…/design-tokens.css`) sets for this token: `--md-sys-color-<slug>` (it follows the active colour scheme), `--md-sys-shape-<slug>`, `--md-sys-elevation-<slug>`. A typography role sets one property per value — `<cssVar>-font-family`, `-font-size`, `-line-height`, `-font-weight`, `-letter-spacing` — and `cssVar` is their prefix, `--md-sys-typescale-<slug>`. */
             cssVar: string;
-            /** @description The default scheme's value (what the sheet's `:root` sets), e.g. `#6750a4`; `null` when the token has none. */
-            value: string | null;
+            /** @description What the sheet's `:root` sets: a colour role's default-scheme value (`#6750a4`), a radius (`12px`) or a box-shadow; for typography an object `{ fontFamily, fontSize, lineHeight, fontWeight, letterSpacing }`, `fontFamily` as the font-family stack. `null` when the token has none. */
+            value: string | {
+                [key: string]: unknown;
+            } | null;
         };
         /** @description The `document` half of a single document read — `shapePublicDocument` (`services/public-document-service.js`). */
         Document: {
