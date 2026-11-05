@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Hypervalent Public API",
-    "version": "1.10.0",
+    "version": "1.12.0",
     "summary": "The token-authenticated content delivery and authoring API behind Hypervalent Studio.",
     "description": "Every route lives under `/orgs/{org_id}/projects/{projectSlug}/…` — the project is a **required path segment**, never a query\nparameter — except the two org-level discovery reads (`/token`, `/projects`). Authenticate with an organization API token\n(`atk_…`) in `Authorization: Bearer` or `X-API-Key`. Bodies are JSON with camelCase keys. Read responses for organizations\nwithout the `removeBranding` entitlement carry a `poweredBy` string.\n\nThis document is generated from the server's route table and token allow-list; the schemas are hand-authored beside\nthe shapers they describe. See https://docs.hypervalent.io/api/ for the guide.",
     "contact": {
@@ -1712,7 +1712,7 @@
         ],
         "operationId": "getDesignTokensW3C",
         "summary": "W3C tokens.json export",
-        "description": "The published tokens in the W3C Design Tokens JSON format. Errors from this raw export use the nested `{ error }` envelope; an unknown org or project answers `{ \"error\": \"Not found\" }`.",
+        "description": "The published tokens in the W3C Design Tokens JSON format. Each color role's `$value` is the `light-standard` scheme's, and every scheme's value is in its `$extensions[\"com.atomic-cms.modes\"]`. Pass `scheme` for one scheme's values as plain `$value`s, the one-file-per-mode form Figma's variable import and Tokens Studio themes read. Errors from this raw export use the nested `{ error }` envelope; an unknown org or project answers `{ \"error\": \"Not found\" }`, and an unknown `scheme` a 400 `VALIDATION_ERROR`.",
         "parameters": [
           {
             "name": "org_id",
@@ -1731,6 +1731,14 @@
               "type": "string"
             },
             "description": "The project slug. Discover it with `GET /orgs/{org_id}/projects`. A project-narrowed token may only name its own project (403 `TOKEN_PROJECT_MISMATCH` otherwise)."
+          },
+          {
+            "name": "scheme",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "A published color scheme slug (e.g. `dark-high`; list them with `GET …/design-token-schemes`). Each color role's `$value` becomes that scheme's value, inherited through `baseSchemeSlug` when the scheme has none of its own, and the document's root `$extensions[\"com.atomic-cms.scheme\"]` names it. Every other token is the same in every scheme."
           }
         ],
         "responses": {
@@ -1740,6 +1748,23 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/W3CDesignTokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`VALIDATION_ERROR` (`field: \"scheme\"`) — `scheme` names no published color scheme; the message lists the ones there are",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
                 }
               }
             }
@@ -4419,7 +4444,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
                 }
               }
             }
@@ -4500,7 +4532,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorEnvelope"
+                    }
+                  ]
                 }
               }
             }
@@ -8880,7 +8919,7 @@
             "description": "Only the keys the field type reads: select `options` (required — `[{ value, text?, selected? }]` or strings); number / range `min`, `max`, `step`; html `toolbar` (the toolbar switches, `headings: [1–6]`); image `dragDropEnabled`; image / file / video `maxFileSizeBytes`. Any other key is refused."
           },
           "defaultValue": {
-            "description": "A value of the field's shape: a string for text-like types (a safe link for `link`); a number for number / range, within `min` / `max`; a boolean; one of the option values for select; `{ top?, right?, bottom?, left? }` numbers for spacing; an array of media uuids (or video URLs) for image / file / video. An array of those when `multiple`."
+            "description": "A value of the field's shape: a string for text-like types (a safe link for `link`); for color, a CSS colour string or `{ \"token\": \"<slug>\" }` naming one of the project's published colour roles; a number for number / range, within `min` / `max`; a boolean; one of the option values for select; `{ top?, right?, bottom?, left? }` numbers for spacing; an array of media uuids (or video URLs) for image / file / video. An array of those when `multiple`."
           }
         }
       },
@@ -9814,7 +9853,7 @@
             "format": "uuid"
           },
           "value": {
-            "description": "Any JSON value. An image field holds image uuid(s) — look them up in `referencedImages`. A file field holds media uuid(s) — look them up in `referencedFiles`; a non-uuid string there is an external URL written before file fields picked from the media library. A video field holds video uuid(s) — also in `referencedFiles` — and/or external video URLs (YouTube, Vimeo, …) as non-uuid strings."
+            "description": "Any JSON value. An image field holds image uuid(s) — look them up in `referencedImages`. A file field holds media uuid(s) — look them up in `referencedFiles`; a non-uuid string there is an external URL written before file fields picked from the media library. A video field holds video uuid(s) — also in `referencedFiles` — and/or external video URLs (YouTube, Vimeo, …) as non-uuid strings. A color field holds a CSS colour string or `{ \"token\": \"<slug>\" }` — look the slug up in `referencedTokens`."
           },
           "locked": {
             "type": "integer",
@@ -10039,6 +10078,41 @@
           }
         }
       },
+      "ReferencedToken": {
+        "type": "object",
+        "description": "A published design token referenced by a version's color fields as `{ \"token\": \"<slug>\" }` (content or root atoms) — `shapeReferencedColorToken` (`services/referenced-tokens.js`). A reference to a token that is missing, unpublished or a palette tone is left out; fall back to the field's default.",
+        "required": [
+          "slug",
+          "type",
+          "cssVar",
+          "value"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "The token slug the value names."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "color"
+            ],
+            "description": "The token type. Only colour roles are referenced today."
+          },
+          "cssVar": {
+            "type": "string",
+            "description": "The custom property the public CSS export (`…/design-tokens.css`) sets for this token, e.g. `--md-sys-color-primary`. It follows the active colour scheme."
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The default scheme's value (what the sheet's `:root` sets), e.g. `#6750a4`; `null` when the token has none."
+          }
+        }
+      },
       "Document": {
         "type": "object",
         "description": "The `document` half of a single document read — `shapePublicDocument` (`services/public-document-service.js`).",
@@ -10252,7 +10326,8 @@
           "version",
           "taxonomies",
           "referencedImages",
-          "referencedFiles"
+          "referencedFiles",
+          "referencedTokens"
         ],
         "properties": {
           "document": {
@@ -10284,6 +10359,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReferencedFile"
+            }
+          },
+          "referencedTokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferencedToken"
             }
           },
           "poweredBy": {
@@ -10387,7 +10468,8 @@
           "documentType",
           "documents",
           "referencedImages",
-          "referencedFiles"
+          "referencedFiles",
+          "referencedTokens"
         ],
         "properties": {
           "documentType": {
@@ -10436,6 +10518,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReferencedFile"
+            }
+          },
+          "referencedTokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferencedToken"
             }
           },
           "poweredBy": {
@@ -10856,7 +10944,8 @@
           "taxonomy",
           "terms",
           "referencedImages",
-          "referencedFiles"
+          "referencedFiles",
+          "referencedTokens"
         ],
         "properties": {
           "taxonomy": {
@@ -10907,6 +10996,12 @@
               "$ref": "#/components/schemas/ReferencedFile"
             }
           },
+          "referencedTokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferencedToken"
+            }
+          },
           "poweredBy": {
             "type": "string",
             "description": "Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses."
@@ -10920,7 +11015,8 @@
           "term",
           "version",
           "referencedImages",
-          "referencedFiles"
+          "referencedFiles",
+          "referencedTokens"
         ],
         "properties": {
           "term": {
@@ -10961,6 +11057,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReferencedFile"
+            }
+          },
+          "referencedTokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferencedToken"
             }
           },
           "poweredBy": {

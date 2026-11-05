@@ -54,6 +54,8 @@ export async function ok() {
   const hero: string[] | null | undefined = version?.rootAtoms['image-field']
   const tags: string[] | null | undefined = version?.rootAtoms.tags
   const top: number | undefined = version?.rootAtoms['spacing-field']?.top
+  const accent = version?.rootAtoms['color-field']
+  const accentToken: string | undefined = typeof accent === 'object' && accent !== null ? accent.token : undefined
   for (const block of version?.blocks ?? []) {
     if (block.molecule === 'hero') {
       const value: number | null = block.atoms['number-field']
@@ -63,17 +65,19 @@ export async function ok() {
   for await (const row of posts.iterate()) void row.rootAtoms['date-field']
   await posts.create({
     title: 'x',
-    rootAtoms: { 'text-field': 'x', 'number-field': 1, 'select-field': 'large', 'image-field': ['u'], 'tags': ['a'], 'spacing-field': { top: 1 }, 'date-field': null },
+    rootAtoms: { 'text-field': 'x', 'color-field': { token: 'primary' }, 'number-field': 1, 'select-field': 'large', 'image-field': ['u'], 'tags': ['a'], 'spacing-field': { top: 1 }, 'date-field': null },
     blocks: [{ molecule: 'hero', atoms: { 'number-field': 1 }, children: [{ molecule: 'card', atoms: { 'text-field': 'x' } }, { molecule: 'hero' }] }]
   })
   await site.terms('topic').update('t', { rootAtoms: { 'text-field': 'x' } })
   await site.atoms.list()
-  return [text, count, flag, size, hero, tags, top]
+  return [text, count, flag, size, hero, tags, top, accentToken]
 }
 
 export async function refused() {
   // @ts-expect-error not a field
   await posts.create({ title: 'x', rootAtoms: { nope: 1 } })
+  // @ts-expect-error a colour is a string or { token }
+  await posts.create({ title: 'x', rootAtoms: { 'color-field': { hex: '#fff' } } })
   // @ts-expect-error a number field
   await posts.create({ title: 'x', rootAtoms: { 'number-field': 'one' } })
   // @ts-expect-error not an option
@@ -108,6 +112,8 @@ describe('the field type mapping', () => {
     expect(fieldTsType(atom('number', true))).toBe('number[]')
     expect(fieldTsType({ ...atom('select', 1), fieldConfig: { options: ['a', 'b'] } })).toBe('("a" | "b")[]')
     expect(fieldTsType(atom('select', 0))).toBe('string')
+    expect(fieldTsType(atom('color', 0))).toBe('string | ColorTokenRef')
+    expect(fieldTsType(atom('color', 1))).toBe('(string | ColorTokenRef)[]')
     expect(fieldTsType({ ...atom('select', 0), fieldConfig: { options: [{ value: 1 }, { value: 2 }, 'a'] } })).toBe('1 | 2 | "a"')
     expect(fieldTsType(atom('brand-new', 0))).toBeNull()
   })
@@ -129,6 +135,7 @@ describe('renderSchema', () => {
   it('compiles with no spacing field and an empty project', () => {
     const empty = renderSchema({ ...catalog, atoms: [], molecules: [], doctypes: [], taxonomies: [] })
     expect(empty.source).not.toContain('SpacingValue')
+    expect(empty.source).not.toContain('ColorTokenRef')
     expect(compileGenerated(ts, { 'schema.ts': empty.source })).toEqual([])
   }, 60_000)
 
@@ -185,6 +192,7 @@ function api(projects: { uuid: string, slug: string, title?: string }[] = [{ ...
       { uuid: atomUuid('image'), value: 'one-uuid', locked: 0, required: 0 },
       { uuid: atomUuid('date'), value: {}, locked: 0, required: 0 },
       { uuid: atomUuid('spacing'), value: {}, locked: 0, required: 0 },
+      { uuid: atomUuid('color'), value: { token: '' }, locked: 0, required: 0 },
       { uuid: uuid(999), value: 'added since', locked: 0, required: 0 }
     ],
     content: [{ uuid: uuid(21), key: 'k1', atoms: { 'number-field': 3 }, children: [{ uuid: uuid(888), key: 'k2', atoms: { a: 1 }, children: [] }] }]
@@ -281,6 +289,7 @@ describe('a client with a schema', () => {
     expect(version.rootAtoms['image-field'], 'one string becomes an array').toEqual(['one-uuid'])
     expect(version.rootAtoms['date-field'], '{} means no value').toBeNull()
     expect(version.rootAtoms['spacing-field'], '{} is a value here').toEqual({})
+    expect(version.rootAtoms['color-field'], 'an unpicked token is no value').toBeNull()
     expect(version.rootAtoms['number-field'], 'a field the read lacks').toBeNull()
     expect(version.unmappedRootAtoms.map((atom: { uuid: string }) => atom.uuid)).toEqual([uuid(999)])
     expect(version.content[0].uuid, 'the raw tree is left alone').toBe(uuid(21))

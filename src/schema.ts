@@ -14,6 +14,15 @@ export interface SpacingValue {
   left?: number
 }
 
+/**
+ * A color field's design-token reference (API spec 1.12.0): `token` is a colour role's slug.
+ * A content read lists each referenced role once in `referencedTokens`, with the CSS variable
+ * the public stylesheet sets (`cssVar`) and the default scheme's value.
+ */
+export interface ColorTokenRef {
+  token: string
+}
+
 export interface AtomSchema {
   uuid: string
   fieldType: string
@@ -228,11 +237,13 @@ export function mapWriteBody(schema: ProjectSchema, container: ContainerSchema, 
 
 /**
  * `{}` is the API's stored "no default" on every field but spacing. A media field
- * is always an array here, though older values can be one string.
+ * is always an array here, though older values can be one string. A color field's
+ * `{ token: "" }` (Studio's Token tab before a role is picked) is no value too.
  */
 function readValue(atom: AtomSchema, value: unknown) {
   if (value === undefined || value === null) return null
   if (atom.fieldType !== 'spacing' && isPlainObject(value) && Object.keys(value).length === 0) return null
+  if (atom.fieldType === 'color' && isPlainObject(value) && value.token === '') return null
   if (MEDIA_TYPES.has(atom.fieldType) && typeof value === 'string') return [value]
   return value
 }

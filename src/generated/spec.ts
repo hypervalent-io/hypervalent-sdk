@@ -2,7 +2,7 @@
 // run `npm run generate`. `npm run check` fails when this file differs.
 
 /** The `info.version` of the OpenAPI document these types were generated from. */
-export const SPEC_VERSION = "1.10.0"
+export const SPEC_VERSION = "1.12.0"
 
 /** Every `operationId` in that document. */
 export const OPERATION_IDS = [
