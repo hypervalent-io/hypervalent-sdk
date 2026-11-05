@@ -21,6 +21,7 @@ export {
   type ReadFields,
   type SchemaTypes,
   type SpacingValue,
+  type TokenRef,
   type TypedContent,
   type TypedDocumentsResource,
   type TypedTermsResource,
