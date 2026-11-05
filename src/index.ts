@@ -13,6 +13,7 @@ export { type MediaFieldType, type MediaReferences, resolveFieldMedia } from './
 export type { CallOptions, ClientResources, DocumentsResource, MediaUploaded, ProjectResources, TermsResource, UploadOptions } from './resources'
 export {
   type AtomSchema,
+  type ColorTokenRef,
   type ContainerSchema,
   defineSchema,
   type ProjectSchema,

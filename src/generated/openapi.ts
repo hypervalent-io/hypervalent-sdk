@@ -164,7 +164,7 @@ export interface paths {
         };
         /**
          * W3C tokens.json export
-         * @description The published tokens in the W3C Design Tokens JSON format. Errors from this raw export use the nested `{ error }` envelope; an unknown org or project answers `{ "error": "Not found" }`.
+         * @description The published tokens in the W3C Design Tokens JSON format. Each color role's `$value` is the `light-standard` scheme's, and every scheme's value is in its `$extensions["com.atomic-cms.modes"]`. Pass `scheme` for one scheme's values as plain `$value`s, the one-file-per-mode form Figma's variable import and Tokens Studio themes read. Errors from this raw export use the nested `{ error }` envelope; an unknown org or project answers `{ "error": "Not found" }`, and an unknown `scheme` a 400 `VALIDATION_ERROR`.
          */
         get: operations["getDesignTokensW3C"];
         put?: never;
@@ -1130,7 +1130,7 @@ export interface components {
             fieldConfig?: {
                 [key: string]: unknown;
             };
-            /** @description A value of the field's shape: a string for text-like types (a safe link for `link`); a number for number / range, within `min` / `max`; a boolean; one of the option values for select; `{ top?, right?, bottom?, left? }` numbers for spacing; an array of media uuids (or video URLs) for image / file / video. An array of those when `multiple`. */
+            /** @description A value of the field's shape: a string for text-like types (a safe link for `link`); for color, a CSS colour string or `{ "token": "<slug>" }` naming one of the project's published colour roles; a number for number / range, within `min` / `max`; a boolean; one of the option values for select; `{ top?, right?, bottom?, left? }` numbers for spacing; an array of media uuids (or video URLs) for image / file / video. An array of those when `multiple`. */
             defaultValue?: unknown;
         };
         MoleculeWrite: {
@@ -1434,7 +1434,7 @@ export interface components {
         ProjectedRootAtom: {
             /** Format: uuid */
             uuid: string;
-            /** @description Any JSON value. An image field holds image uuid(s) — look them up in `referencedImages`. A file field holds media uuid(s) — look them up in `referencedFiles`; a non-uuid string there is an external URL written before file fields picked from the media library. A video field holds video uuid(s) — also in `referencedFiles` — and/or external video URLs (YouTube, Vimeo, …) as non-uuid strings. */
+            /** @description Any JSON value. An image field holds image uuid(s) — look them up in `referencedImages`. A file field holds media uuid(s) — look them up in `referencedFiles`; a non-uuid string there is an external URL written before file fields picked from the media library. A video field holds video uuid(s) — also in `referencedFiles` — and/or external video URLs (YouTube, Vimeo, …) as non-uuid strings. A color field holds a CSS colour string or `{ "token": "<slug>" }` — look the slug up in `referencedTokens`. */
             value: unknown;
             /** @enum {integer} */
             locked: 0 | 1;
@@ -1503,6 +1503,20 @@ export interface components {
             /** @description Bytes. */
             size: number;
         };
+        /** @description A published design token referenced by a version's color fields as `{ "token": "<slug>" }` (content or root atoms) — `shapeReferencedColorToken` (`services/referenced-tokens.js`). A reference to a token that is missing, unpublished or a palette tone is left out; fall back to the field's default. */
+        ReferencedToken: {
+            /** @description The token slug the value names. */
+            slug: string;
+            /**
+             * @description The token type. Only colour roles are referenced today.
+             * @enum {string}
+             */
+            type: "color";
+            /** @description The custom property the public CSS export (`…/design-tokens.css`) sets for this token, e.g. `--md-sys-color-primary`. It follows the active colour scheme. */
+            cssVar: string;
+            /** @description The default scheme's value (what the sheet's `:root` sets), e.g. `#6750a4`; `null` when the token has none. */
+            value: string | null;
+        };
         /** @description The `document` half of a single document read — `shapePublicDocument` (`services/public-document-service.js`). */
         Document: {
             /** Format: uuid */
@@ -1565,6 +1579,7 @@ export interface components {
             taxonomies: components["schemas"]["DocumentTaxonomy"][];
             referencedImages: components["schemas"]["ReferencedImage"][];
             referencedFiles: components["schemas"]["ReferencedFile"][];
+            referencedTokens: components["schemas"]["ReferencedToken"][];
             /** @description Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses. */
             poweredBy?: string;
         };
@@ -1609,6 +1624,7 @@ export interface components {
             };
             referencedImages: components["schemas"]["ReferencedImage"][];
             referencedFiles: components["schemas"]["ReferencedFile"][];
+            referencedTokens: components["schemas"]["ReferencedToken"][];
             /** @description Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses. */
             poweredBy?: string;
         };
@@ -1762,6 +1778,7 @@ export interface components {
             };
             referencedImages: components["schemas"]["ReferencedImage"][];
             referencedFiles: components["schemas"]["ReferencedFile"][];
+            referencedTokens: components["schemas"]["ReferencedToken"][];
             /** @description Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses. */
             poweredBy?: string;
         };
@@ -1773,6 +1790,7 @@ export interface components {
             version: components["schemas"]["Version"] | null;
             referencedImages: components["schemas"]["ReferencedImage"][];
             referencedFiles: components["schemas"]["ReferencedFile"][];
+            referencedTokens: components["schemas"]["ReferencedToken"][];
             /** @description Present on every read for organizations without the `removeBranding` entitlement (the value is `Powered by Hypervalent`). Never present on write responses. */
             poweredBy?: string;
         };
@@ -2933,7 +2951,10 @@ export interface operations {
     };
     getDesignTokensW3C: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A published color scheme slug (e.g. `dark-high`; list them with `GET …/design-token-schemes`). Each color role's `$value` becomes that scheme's value, inherited through `baseSchemeSlug` when the scheme has none of its own, and the document's root `$extensions["com.atomic-cms.scheme"]` names it. Every other token is the same in every scheme. */
+                scheme?: string;
+            };
             header?: never;
             path: {
                 /** @description The organization's public id — shown in Studio → Settings → API tokens and in the MCP server URL. Never the organization's uuid. */
@@ -2952,6 +2973,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["W3CDesignTokens"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` (`field: "scheme"`) — `scheme` names no published color scheme; the message lists the ones there are */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description `API_TOKEN_REQUIRED` — no credential; `INVALID_API_TOKEN` — revoked, expired, unknown, or another organization's token (nested `{ error }` envelope from the authenticator). */
@@ -4601,7 +4631,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description `API_TOKEN_REQUIRED` — no credential; `INVALID_API_TOKEN` — revoked, expired, unknown, or another organization's token (nested `{ error }` envelope from the authenticator). */
@@ -4655,7 +4685,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description `VALIDATION_ERROR` — the payload was refused; `fields` names each problem. Nothing was written. */
