@@ -1113,7 +1113,7 @@ export interface components {
              */
             status?: "draft" | "published";
             /** @enum {string} */
-            fieldType: "text" | "textarea" | "html" | "markdown" | "number" | "color" | "image" | "select" | "range" | "spacing" | "date" | "boolean" | "icon" | "link" | "video" | "file" | "email" | "tel" | "slug";
+            fieldType: "text" | "textarea" | "html" | "markdown" | "json" | "number" | "color" | "image" | "select" | "range" | "spacing" | "date" | "boolean" | "icon" | "link" | "video" | "file" | "email" | "tel" | "slug";
             /**
              * @description Editor layout: `style` atoms edit in the right rail, `content` / `media` in the canvas.
              * @default content
@@ -1464,7 +1464,7 @@ export interface components {
             thumb1024Url: string | null;
             /** Format: date-time */
             dateCreated: string;
-            /** @description `true` when an upload matched an existing image by content hash and the existing row was returned. */
+            /** @description `true` when an upload matched an existing image by content hash and the existing row was returned. A match in the trash is restored first. */
             deduped: boolean;
         };
         /** @description An image referenced by a version's image fields (content or root atoms), — `shapeReferencedImage` (`queries/images/cast-image-row.js`). The `Image` fields except `deduped`, which only an upload answers. */
