@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Hypervalent Public API",
-    "version": "1.8.0",
+    "version": "1.10.0",
     "summary": "The token-authenticated content delivery and authoring API behind Hypervalent Studio.",
     "description": "Every route lives under `/orgs/{org_id}/projects/{projectSlug}/…` — the project is a **required path segment**, never a query\nparameter — except the two org-level discovery reads (`/token`, `/projects`). Authenticate with an organization API token\n(`atk_…`) in `Authorization: Bearer` or `X-API-Key`. Bodies are JSON with camelCase keys. Read responses for organizations\nwithout the `removeBranding` entitlement carry a `poweredBy` string.\n\nThis document is generated from the server's route table and token allow-list; the schemas are hand-authored beside\nthe shapers they describe. See https://docs.hypervalent.io/api/ for the guide.",
     "contact": {
@@ -8832,6 +8832,7 @@
               "textarea",
               "html",
               "markdown",
+              "json",
               "number",
               "color",
               "image",
@@ -9917,7 +9918,7 @@
           },
           "deduped": {
             "type": "boolean",
-            "description": "`true` when an upload matched an existing image by content hash and the existing row was returned."
+            "description": "`true` when an upload matched an existing image by content hash and the existing row was returned. A match in the trash is restored first."
           }
         }
       },

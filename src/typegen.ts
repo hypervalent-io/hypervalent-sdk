@@ -51,6 +51,7 @@ export const FIELD_TYPE_MAPPINGS: Record<string, (atom: AtomInput) => string> = 
   textarea: scalar('string'),
   html: scalar('string'),
   markdown: scalar('string'),
+  json: scalar('string'),
   number: scalar('number'),
   color: scalar('string'),
   image: scalar('string'),

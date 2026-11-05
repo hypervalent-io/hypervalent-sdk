@@ -2,6 +2,13 @@
 
 Each release of `@hypervalent-io/sdk` has a section here, and a `vX.Y.Z` tag cannot publish without one. Before 1.0.0 a minor version may break the client's API.
 
+## 0.4.0
+
+The `json` field type, and wire types synced to API spec 1.10.0.
+
+- Typegen maps a `json` field to `string`: the value is the JSON text exactly as the author wrote it, and your code runs `JSON.parse` on it. The API refuses a write whose JSON does not parse with 422 `VALIDATION_ERROR`
+- `AtomWrite.fieldType` and the other field-type unions include `json` (spec 1.10.0; 1.9.0 changed a description only)
+
 ## 0.3.0
 
 Media library reads, and wire types synced to API spec 1.8.0.
