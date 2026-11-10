@@ -1126,11 +1126,11 @@ export interface components {
              * @enum {boolean|integer}
              */
             multiple?: true | false | 0 | 1;
-            /** @description Only the keys the field type reads: select `options` (required — `[{ value, text?, selected? }]` or strings); number / range `min`, `max`, `step`; html `toolbar` (the toolbar switches, `headings: [1–6]`); image `dragDropEnabled`; image / file / video `maxFileSizeBytes`; token `tokenType` (required — `radius`, `elevation` or `typography`: the design-token type the field picks from). Any other key is refused. */
+            /** @description Only the keys the field type reads: select `options` (required — `[{ value, text?, selected? }]` or strings); number / range `min`, `max`, `step`; html `toolbar` (the toolbar switches, `headings: [1–6]`); image `dragDropEnabled`; image / file / video `maxFileSizeBytes`; token `tokenType` (required — `radius`, `elevation` or `typography`: the design-token type the field picks from); spacing `allowCustom` (default `true`; `false` limits every side to a step of the spacing scale). Any other key is refused. */
             fieldConfig?: {
                 [key: string]: unknown;
             };
-            /** @description A value of the field's shape: a string for text-like types (a safe link for `link`); for color, a CSS colour string or `{ "token": "<slug>" }` naming one of the project's published colour roles; for token, `{ "token": "<slug>" }` naming one of the project's published tokens of the field's `tokenType`; a number for number / range, within `min` / `max`; a boolean; one of the option values for select; `{ top?, right?, bottom?, left? }` numbers for spacing; an array of media uuids (or video URLs) for image / file / video. An array of those when `multiple`. */
+            /** @description A value of the field's shape: a string for text-like types (a safe link for `link`); for color, a CSS colour string or `{ "token": "<slug>" }` naming one of the project's published colour roles; for token, `{ "token": "<slug>" }` naming one of the project's published tokens of the field's `tokenType`; a number for number / range, within `min` / `max`; a boolean; one of the option values for select; `{ top?, right?, bottom?, left? }` for spacing, each side a number of pixels or `{ "token": "<slug>" }` naming one of the project's published spacing steps (steps only when `allowCustom` is `false`); an array of media uuids (or video URLs) for image / file / video. An array of those when `multiple`. */
             defaultValue?: unknown;
         };
         MoleculeWrite: {
@@ -1260,7 +1260,7 @@ export interface components {
              */
             status: "published" | "draft";
             sortOrder?: number | null;
-            /** @description `color`, `typography`, `radius`, `elevation`, `state`, `motion`, `font-family` or `component`. */
+            /** @description `color`, `typography`, `radius`, `elevation`, `state`, `motion`, `font-family`, `spacing` or `component`. */
             designTokenType: string;
             tokenCategory?: string | null;
             materialRole?: string | null;
@@ -1503,18 +1503,18 @@ export interface components {
             /** @description Bytes. */
             size: number;
         };
-        /** @description A published design token referenced by a version's color or token fields as `{ "token": "<slug>" }` (content or root atoms) — `shapeReferencedColorToken` / `shapeReferencedDesignToken` (`services/referenced-tokens.js`). A reference to a token that is missing, unpublished or a palette tone — or, from a token field, a token of another type than its `tokenType` — is left out; fall back to the field's default. */
+        /** @description A published design token referenced by a version's color or token fields, or a side of its spacing fields, as `{ "token": "<slug>" }` (content or root atoms) — `shapeReferencedColorToken` / `shapeReferencedDesignToken` (`services/referenced-tokens.js`). A reference to a token that is missing, unpublished or a palette tone — or, from a token field, a token of another type than its `tokenType` — is left out; fall back to the field's default. */
         ReferencedToken: {
             /** @description The token slug the value names. */
             slug: string;
             /**
-             * @description The token type: `color` from a color field, the field's `tokenType` from a token field.
+             * @description The token type: `color` from a color field, the field's `tokenType` from a token field, `spacing` from a spacing field's side.
              * @enum {string}
              */
-            type: "color" | "radius" | "elevation" | "typography";
-            /** @description The custom property the public CSS export (`…/design-tokens.css`) sets for this token: `--md-sys-color-<slug>` (it follows the active colour scheme), `--md-sys-shape-<slug>`, `--md-sys-elevation-<slug>`. A typography role sets one property per value — `<cssVar>-font-family`, `-font-size`, `-line-height`, `-font-weight`, `-letter-spacing` — and `cssVar` is their prefix, `--md-sys-typescale-<slug>`. */
+            type: "color" | "radius" | "elevation" | "typography" | "spacing";
+            /** @description The custom property the public CSS export (`…/design-tokens.css`) sets for this token: `--md-sys-color-<slug>` (it follows the active colour scheme), `--md-sys-shape-<slug>`, `--md-sys-elevation-<slug>`, `--md-sys-spacing-<slug>`. A typography role sets one property per value — `<cssVar>-font-family`, `-font-size`, `-line-height`, `-font-weight`, `-letter-spacing` — and `cssVar` is their prefix, `--md-sys-typescale-<slug>`. */
             cssVar: string;
-            /** @description What the sheet's `:root` sets: a colour role's default-scheme value (`#6750a4`), a radius (`12px`) or a box-shadow; for typography an object `{ fontFamily, fontSize, lineHeight, fontWeight, letterSpacing }`, `fontFamily` as the font-family stack. `null` when the token has none. */
+            /** @description What the sheet's `:root` sets: a colour role's default-scheme value (`#6750a4`), a radius (`12px`), a box-shadow or a spacing step (`24px`); for typography an object `{ fontFamily, fontSize, lineHeight, fontWeight, letterSpacing }`, `fontFamily` as the font-family stack. `null` when the token has none. */
             value: string | {
                 [key: string]: unknown;
             } | null;

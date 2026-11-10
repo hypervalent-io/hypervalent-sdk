@@ -2,6 +2,14 @@
 
 Each release of `@hypervalent-io/sdk` has a section here, and a `vX.Y.Z` tag cannot publish without one. Before 1.0.0 a minor version may break the client's API.
 
+## 0.5.0
+
+Spacing steps, and wire types synced to API spec 1.14.0.
+
+- A spacing field's side can be a step of the project's spacing scale, `{ token: '<slug>' }`, as well as a number of pixels (spec 1.14.0). `SpacingValue`'s sides are now `number | TokenRef`, so code that did arithmetic on a side must handle the object. A typed write takes either form. A field whose `fieldConfig.allowCustom` is `false` takes steps only in its default (the atom, binding and preset writes refuse pixels there with 422 `VALIDATION_ERROR`); document and term content is checked for shape only, so stored pixel sides still read and write back
+- A read drops a spacing side that is `null` or an unpicked step (`{ token: '' }`), as it does for an empty colour or token field
+- `referencedTokens` entries can be `type: 'spacing'`: `cssVar` is `--md-sys-spacing-<slug>` and `value` the step's length, such as `24px`
+
 ## 0.4.0
 
 The `json` and `token` field types, colour token references, and wire types synced to API spec 1.13.0.
