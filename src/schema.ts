@@ -6,12 +6,17 @@ import { assertWriteAllowed } from './transport'
 
 type Schemas = components['schemas']
 
-/** The value of a spacing field, in pixels. */
+/**
+ * The value of a spacing field. Each side is a number of pixels or, since API spec 1.14.0, a
+ * step of the project's spacing scale (`{ token: 'xl' }`, a {@link TokenRef}); a missing side is
+ * not set. A content read lists each step once in `referencedTokens`, with its CSS variable
+ * (`--md-sys-spacing-<slug>`) and value.
+ */
 export interface SpacingValue {
-  top?: number
-  right?: number
-  bottom?: number
-  left?: number
+  top?: number | TokenRef
+  right?: number | TokenRef
+  bottom?: number | TokenRef
+  left?: number | TokenRef
 }
 
 /**
@@ -247,12 +252,17 @@ export function mapWriteBody(schema: ProjectSchema, container: ContainerSchema, 
 /**
  * `{}` is the API's stored "no default" on every field but spacing. A media field
  * is always an array here, though older values can be one string. A color or token
- * field's `{ token: "" }` (nothing picked yet in Studio) is no value too.
+ * field's `{ token: "" }` (nothing picked yet in Studio) is no value too, and so is a spacing
+ * side that is `null` or `{ token: "" }`.
  */
 function readValue(atom: AtomSchema, value: unknown) {
   if (value === undefined || value === null) return null
   if (atom.fieldType !== 'spacing' && isPlainObject(value) && Object.keys(value).length === 0) return null
   if ((atom.fieldType === 'color' || atom.fieldType === 'token') && isPlainObject(value) && value.token === '') return null
+  // A spacing side that is null or an unpicked step is no value: drop it, so a side is pixels or a step.
+  if (atom.fieldType === 'spacing' && isPlainObject(value)) {
+    return Object.fromEntries(Object.entries(value).filter(([, side]) => side !== null && !(isPlainObject(side) && side.token === '')))
+  }
   if (MEDIA_TYPES.has(atom.fieldType) && typeof value === 'string') return [value]
   return value
 }

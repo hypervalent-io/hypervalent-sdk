@@ -53,7 +53,9 @@ export async function ok() {
   const size: 'small' | 'large' | null | undefined = version?.rootAtoms['select-field']
   const hero: string[] | null | undefined = version?.rootAtoms['image-field']
   const tags: string[] | null | undefined = version?.rootAtoms.tags
-  const top: number | undefined = version?.rootAtoms['spacing-field']?.top
+  const side = version?.rootAtoms['spacing-field']?.top
+  const top: number | undefined = typeof side === 'number' ? side : undefined
+  const step: string | undefined = typeof side === 'object' ? side.token : undefined
   const accent = version?.rootAtoms['color-field']
   const accentToken: string | undefined = typeof accent === 'object' && accent !== null ? accent.token : undefined
   const corner: string | undefined = version?.rootAtoms['token-field']?.token
@@ -66,12 +68,12 @@ export async function ok() {
   for await (const row of posts.iterate()) void row.rootAtoms['date-field']
   await posts.create({
     title: 'x',
-    rootAtoms: { 'text-field': 'x', 'color-field': { token: 'primary' }, 'token-field': { token: 'corner-medium' }, 'number-field': 1, 'select-field': 'large', 'image-field': ['u'], 'tags': ['a'], 'spacing-field': { top: 1 }, 'date-field': null },
+    rootAtoms: { 'text-field': 'x', 'color-field': { token: 'primary' }, 'token-field': { token: 'corner-medium' }, 'number-field': 1, 'select-field': 'large', 'image-field': ['u'], 'tags': ['a'], 'spacing-field': { top: 1, bottom: { token: 'xl' } }, 'date-field': null },
     blocks: [{ molecule: 'hero', atoms: { 'number-field': 1 }, children: [{ molecule: 'card', atoms: { 'text-field': 'x' } }, { molecule: 'hero' }] }]
   })
   await site.terms('topic').update('t', { rootAtoms: { 'text-field': 'x' } })
   await site.atoms.list()
-  return [text, count, flag, size, hero, tags, top, accentToken, corner]
+  return [text, count, flag, size, hero, tags, top, step, accentToken, corner]
 }
 
 export async function refused() {
@@ -81,6 +83,8 @@ export async function refused() {
   await posts.create({ title: 'x', rootAtoms: { 'color-field': { hex: '#fff' } } })
   // @ts-expect-error a token field takes { token }, not a CSS value
   await posts.create({ title: 'x', rootAtoms: { 'token-field': '12px' } })
+  // @ts-expect-error a spacing side is pixels or { token }, not a CSS string
+  await posts.create({ title: 'x', rootAtoms: { 'spacing-field': { top: '16px' } } })
   // @ts-expect-error a number field
   await posts.create({ title: 'x', rootAtoms: { 'number-field': 'one' } })
   // @ts-expect-error not an option
@@ -196,7 +200,7 @@ function api(projects: { uuid: string, slug: string, title?: string }[] = [{ ...
       { uuid: atomUuid('text'), value: 'Hello', locked: 0, required: 0 },
       { uuid: atomUuid('image'), value: 'one-uuid', locked: 0, required: 0 },
       { uuid: atomUuid('date'), value: {}, locked: 0, required: 0 },
-      { uuid: atomUuid('spacing'), value: {}, locked: 0, required: 0 },
+      { uuid: atomUuid('spacing'), value: { top: 8, right: null, bottom: { token: '' }, left: { token: 'xl' } }, locked: 0, required: 0 },
       { uuid: atomUuid('color'), value: { token: '' }, locked: 0, required: 0 },
       { uuid: atomUuid('token'), value: { token: '' }, locked: 0, required: 0 },
       { uuid: uuid(999), value: 'added since', locked: 0, required: 0 }
@@ -294,7 +298,7 @@ describe('a client with a schema', () => {
     expect(version.rootAtoms['text-field']).toBe('Hello')
     expect(version.rootAtoms['image-field'], 'one string becomes an array').toEqual(['one-uuid'])
     expect(version.rootAtoms['date-field'], '{} means no value').toBeNull()
-    expect(version.rootAtoms['spacing-field'], '{} is a value here').toEqual({})
+    expect(version.rootAtoms['spacing-field'], 'a null or unpicked side is dropped').toEqual({ top: 8, left: { token: 'xl' } })
     expect(version.rootAtoms['color-field'], 'an unpicked token is no value').toBeNull()
     expect(version.rootAtoms['token-field'], 'an unpicked token field is no value').toBeNull()
     expect(version.rootAtoms['number-field'], 'a field the read lacks').toBeNull()
